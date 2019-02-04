@@ -37,7 +37,7 @@ stands &lt;- tibble(id = 1:100) %&gt;%
   mutate(
     cuftPerAc = 3000 *
       1 / (1 + exp(-(age - 40) / 15)) +
-      rnorm(n = 100, mean = 0, sd = 300),
+      rnorm(n = 100, mean = 0, sd = 200),
     cuftPerAc = ifelse(cuftPerAc &lt; 0, 0, cuftPerAc),
     cuftTot = cuftPerAc * acres
   )
@@ -58,7 +58,7 @@ stands %&gt;%
   geom_point() +
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;)) +
   labs(caption = &quot;volume over age for the forest&quot;)</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2306 cubic feet per acre, the population total is 4.687976610^{7} cubic feet!</p>
+<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2523 cubic feet per acre, the population total is 4.54931310^{7} cubic feet!</p>
 </div>
 <div id="designing-a-sample" class="section level2">
 <h2>Designing a sample</h2>
@@ -74,6 +74,7 @@ stands %&gt;%
 \pi_{i} = n * p_{i}
 \]</span></p>
 <p>where <span class="math inline">\(p_{i}\)</span> is the sampling weight for the <span class="math inline">\(i\)</span>th primary sample unit. This works fine when sampling with replacement, but sampling without replacement is slightly more complicated. The probability of including the <span class="math inline">\(i\)</span>th element on the <span class="math inline">\(k\)</span>th draw depends on the elements that were drawn in all draws <span class="math inline">\(1:k\)</span>. The distinction between <span class="math inline">\(p_{i}\)</span> and <span class="math inline">\(\pi_{i}\)</span> is very important. Think of <span class="math inline">\(\pi_{i}\)</span> as the likelihood of including the <span class="math inline">\(i\)</span>th element unconditional on the other elements selected in the sample. This can be calculated by computing the proportion of all possible samples where an element is selected but that sounds very difficult. Instead we will use the power of simulation to obtain an approximation of <span class="math inline">\(\pi_{i}\)</span> for each stand.</p>
+<p>For this sample we are going to weight our sample on <code>age * acres</code> since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume. We have decided that we are going to sample 20 stands and install either one plot per 8 acres or 30 plots per stand, whichever is fewer.</p>
 <pre class="r"><code>stands$prop &lt;- (stands$cuftPerAc * stands$acres) /
   sum(stands$cuftPerAc * stands$acres)
 
@@ -109,7 +110,8 @@ sampleSim20 %&gt;%
   ylim(0, 1.1 * max(sampleSim20$pi_i_sim)) +
   xlab(bquote(&quot;approximate&quot; ~ pi[i])) +
   ylab(bquote(&quot;simulated&quot; ~ pi[i]))</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleSimulation-1.png" width="672" /></p>
+<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleSimulation-1.png" width="672" /> As you can see, there are subtle differences between the approximate <span class="math inline">\(pi_{i}\)</span> values and the <span class="math inline">\(pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
+<p>By plotting <span class="math inline">\(pi_{i}\)</span> in volume and stand acreage space we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.</p>
 <pre class="r"><code>sampleSim20 %&gt;%
   left_join(stands) %&gt;%
   ggplot(
@@ -118,11 +120,14 @@ sampleSim20 %&gt;%
       y = cuftPerAc,
       color = pi_i_sim)
     ) +
-  geom_point()</code></pre>
+  geom_point() +
+  ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;)) +
+  scale_color_continuous(
+    name = bquote(&quot;simulated&quot; ~ pi[i])
+  )</code></pre>
 <pre><code>## Joining, by = c(&quot;id&quot;, &quot;prop&quot;)</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleSimulation-2.png" width="672" /></p>
-<p>As you can see, there are subtle differences between the approximate <span class="math inline">\(pi_{i}\)</span> values and the <span class="math inline">\(pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
-<p>For this sample we are going to weight our sample on <code>age * acres</code> since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume. We have decided that we are going to sample 20 stands and install either one plot per 8 acres or 30 plots per stand, whichever is fewer.</p>
+<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/samplingProbabilityField-1.png" width="672" /></p>
+<p>Now we are going to step through a sample of the population.</p>
 <pre class="r"><code>acresPerPlot &lt;- 8
 
 sampStands &lt;- stands %&gt;%
@@ -161,9 +166,7 @@ stands %&gt;%
   rowwise() %&gt;%
   mutate(
     cuftObs = list(
-      truncnorm::rtruncnorm(
-        a = -Inf, # biological minimum
-        b = Inf, # biological maximum
+      rnorm(# biological maximum
         n = nPlots,
         mean = cuftPerAc,
         sd = (cv / 100) * cuftPerAc
@@ -301,126 +304,14 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;))</code></pre>
 <pre><code>## Warning: Removed 1 rows containing missing values (geom_errorbar).</code></pre>
 <p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleEstimates-1.png" width="672" /></p>
-<pre class="r"><code>simulate_HT &lt;- function(sims, stands, nStands,
-                        acresPerPlot) {
-  
-  sampleSim &lt;- simulate_sample(
-    sims = 10000,
-    stands = stands,
-    nSamp = nStands
-  )
-  
-  out &lt;- bind_rows(
-    lapply(
-      1:sims,
-      function(...) {
-        sampStands &lt;- stands %&gt;%
-          sample_n(
-            size = nStands,
-            weight = prop,
-            replace = FALSE
-          ) %&gt;%
-          group_by(id) %&gt;%
-          mutate(
-            nPlots = max(
-              2,
-              min(ceiling(acres / acresPerPlot), 30)
-            )
-          ) %&gt;%
-          left_join(
-            sampleSim %&gt;%
-              select(id, pi_i = pi_i_sim),
-              by = &quot;id&quot;
-            ) %&gt;%
-          ungroup()
-
-        # stage 2: sample plots
-        plotTab &lt;- sampStands %&gt;%
-          group_by(id) %&gt;%
-          mutate(
-            cuftObs = list(
-              truncnorm::rtruncnorm(
-                a = -Inf, # biological minimum
-                b = Inf,
-                n = nPlots,
-                mean = cuftPerAc,
-                sd = (cv / 100) * cuftPerAc
-              )
-            )
-          ) %&gt;%
-          select(id, cuftObs) %&gt;%
-          unnest() %&gt;%
-          ungroup()
-
-        standDat &lt;- plotTab %&gt;%
-          left_join(
-            sampStands %&gt;%
-              select(id, acres),
-            by = &quot;id&quot;
-          ) %&gt;%
-          group_by(id, acres) %&gt;%
-          summarize(
-            meanObs = mean(cuftObs),
-            tHat = mean(cuftObs * acres),
-            varTHat = mean(acres)^2 * var(cuftObs) / n(),
-            sdObs = sd(cuftObs),
-            nPlots = n()
-          )
-
-        sampleSummary &lt;- standDat %&gt;%
-          left_join(
-            sampStands %&gt;%
-              select(id, pi_i, prop),
-            by = &quot;id&quot;
-          ) %&gt;%
-          ungroup() %&gt;%
-          mutate(
-            subVar = unlist(
-              lapply(
-                1:nrow(.),
-                sub_var,
-                data = .,
-                y = &quot;tHat&quot;,
-                pi_i = &quot;pi_i&quot;,
-                p = &quot;prop&quot;
-              )
-            )
-          ) %&gt;%
-          ungroup() %&gt;%
-          summarize(
-            totalCuft = sum(tHat / pi_i),
-            fpc = 1 - n() / nrow(stands),
-            varTot = fpc * (
-              sum(((1 - pi_i) / pi_i^2) * tHat^2) +
-                sum(subVar) + sum(varTHat / pi_i)
-              ),
-            nObs = n()
-          ) %&gt;%
-          mutate(
-            seTot = sqrt(varTot / nObs),
-            ci90Tot = qt(
-              1 - 0.1 / 2,
-              df = nObs - 1
-              ) * seTot,
-            meanCuft = totalCuft / totalAcres,
-            seMeanCuft = seTot / totalAcres,
-            ci90MeanCuft = ci90Tot / totalAcres,
-            source = &quot;estimate&quot;
-          ) %&gt;%
-          select(
-            source, totalCuft, seTot, ci90Tot,
-            meanCuft, seMeanCuft, ci90MeanCuft,
-            nObs
-          )
-        sampleSummary
-      }
-    )
-  )
-  
-  out
-}
-
-simFrame &lt;- bind_rows(
+</div>
+</div>
+</div>
+<div id="simulate-many-samples" class="section level2">
+<h2>Simulate many samples</h2>
+<p>Though we may be stuck with it in real life, the result of a single sample is not very helpful for evaluating the performance of a sample design. To do that we will simulate many samples and evaluate the performance of various sampling intensities by assessing trends in precison and bias.</p>
+<p>We are simulating 100 samples for six sample intensities: 10, 20, 30, 40, 50, and 60 stands out of the 100 in the population. Stands will be selected using the same probabilities as the example we walked through earlier.</p>
+<pre class="r"><code>simFrame &lt;- bind_rows(
   map(
     .x = c(10, 20, 30, 40, 50, 60),
     .f = simulate_HT,
@@ -445,6 +336,7 @@ simStats &lt;- simFrame %&gt;%
     ci90MeanCuft = mean(ci90MeanCuft),
     propMatchCI = mean(meanInCI)
   )</code></pre>
+<p>The histograms of sample mean for each level of sampling intensity shows that the sample means become more stable as we increase sample size.</p>
 <pre class="r"><code>ggplot(data = simFrame, aes(x = meanCuft)) +
   geom_histogram() +
   theme_bw() +
@@ -462,9 +354,9 @@ simStats &lt;- simFrame %&gt;%
 <pre><code>## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
 <pre><code>## Warning: Removed 12 rows containing missing values (geom_bar).</code></pre>
 <p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot1-1.png" width="672" /></p>
+<p>The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates, but the precision of estimates increases substantially as we sample more stands.</p>
 <pre class="r"><code>simFrame %&gt;%
   group_by(nObs) %&gt;%
-  # sample_n(20) %&gt;%
   mutate(sim = row_number()) %&gt;%
   ggplot(aes(x = meanCuft, y = sim)) +
   geom_errorbarh(
@@ -477,16 +369,17 @@ simStats &lt;- simFrame %&gt;%
   ) +
   geom_point(size = 1, alpha = 0.8) +
   geom_vline(
-    xintercept = truth$meanCuft, color = &quot;green&quot;
+    aes(xintercept = truth$meanCuft),
+    color = &quot;green&quot;
   ) +
   facet_wrap(~ nObs) +
   xlim(
     0,
     max(simFrame$meanCuft) +
       max(simFrame$ci90MeanCuft)
-  ) +
-  theme_bw()</code></pre>
+  )</code></pre>
 <p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot2-1.png" width="672" /></p>
+<p>Based on the criteria we set for acceptable precision (+/- 10% of mean at 90% confidence), we should be able to get by with a sample of 20 stands!</p>
 <pre class="r"><code>outTable &lt;- simStats %&gt;%
   bind_rows(truth %&gt;% select(source, meanCuft)) %&gt;%
   rename(
@@ -521,54 +414,52 @@ pander::pander(
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">10</td>
-<td align="center">2313</td>
-<td align="center">393</td>
+<td align="center">2534</td>
+<td align="center">431.5</td>
 <td align="center">1</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">20</td>
-<td align="center">2303</td>
-<td align="center">209.8</td>
-<td align="center">0.98</td>
+<td align="center">2520</td>
+<td align="center">230.9</td>
+<td align="center">0.99</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">30</td>
-<td align="center">2295</td>
-<td align="center">171.8</td>
-<td align="center">0.98</td>
+<td align="center">2527</td>
+<td align="center">188.9</td>
+<td align="center">1</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">40</td>
-<td align="center">2298</td>
-<td align="center">152</td>
-<td align="center">1</td>
+<td align="center">2533</td>
+<td align="center">166.4</td>
+<td align="center">0.99</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">50</td>
-<td align="center">2305</td>
-<td align="center">131.6</td>
-<td align="center">0.96</td>
+<td align="center">2531</td>
+<td align="center">143.8</td>
+<td align="center">0.97</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">60</td>
-<td align="center">2303</td>
-<td align="center">108.2</td>
-<td align="center">0.93</td>
+<td align="center">2528</td>
+<td align="center">118.9</td>
+<td align="center">0.97</td>
 </tr>
 <tr class="odd">
 <td align="center"><strong>truth</strong></td>
 <td align="center"><strong>-</strong></td>
-<td align="center"><strong>2306</strong></td>
+<td align="center"><strong>2523</strong></td>
 <td align="center"><strong>-</strong></td>
 <td align="center"><strong>-</strong></td>
 </tr>
 </tbody>
 </table>
-</div>
-</div>
 </div>
