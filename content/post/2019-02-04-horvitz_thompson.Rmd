@@ -1,5 +1,5 @@
 ---
-title: "Forest Sampling: Application of Horvitz-Thompson estimators in a two stage sample"
+title: "Forest Inventory: Application of Horvitz-Thompson estimators in a two stage sample"
 author: "Henry Rodman"
 date: "2019-02-04"
 categories: ["R"]
@@ -14,7 +14,7 @@ output:
 
 ```{r setup, include=FALSE}
 pander::panderOptions(
-  'table.split.cells', 5
+  'table.split.cells', 8
 )
 pander::panderOptions(
   'table.split.table', Inf
@@ -39,13 +39,11 @@ The forest is composed of 100 stands of forest that vary in size, most of the st
 # simulate a population of stands
 stands <- tibble(id = 1:100) %>%
   mutate(
-    acres = truncnorm::rtruncnorm(
-      n = 100, a = 1, b = 400,
-      mean = 80, sd = 30
+    acres = runif(
+      n = 100, min = 1, max = 400
     ),
-    age = truncnorm::rtruncnorm(
-      n = 100, a = 10, b = 150,
-      mean = 70, sd = 20
+    age = runif(
+      n = 100, min = 10, max = 150
     ),
     cv = runif(n = 100, min = 10, max = 100)
   ) %>%
@@ -53,8 +51,7 @@ stands <- tibble(id = 1:100) %>%
     cuftPerAc = 3000 *
       1 / (1 + exp(-(age - 40) / 15)) +
       rnorm(n = 100, mean = 0, sd = 300),
-    # cuftPerAc = 50 * age +
-    #   rnorm(n = 100, mean = 0, sd = 600),
+    cuftPerAc = ifelse(cuftPerAc < 0, 0, cuftPerAc),
     cuftTot = cuftPerAc * acres
   )
 
@@ -98,9 +95,8 @@ The distinction between $p_{i}$ and $\pi_{i}$ is very important. Think of $\pi_{
 
 ```{r sampleSimulation}
 
-stands$prop <- sqrt(stands$cuftPerAc) *
-  stands$acres /
-  sum(sqrt(stands$cuftPerAc) * stands$acres)
+stands$prop <- (stands$cuftPerAc * stands$acres) /
+  sum(stands$cuftPerAc * stands$acres)
 
 simulate_sample <- function(sims, stands, nSamp) {
   bind_rows(
@@ -130,7 +126,6 @@ sampleSim20 %>%
   ggplot(aes(x = pi_i_approx, y = pi_i_sim)) +
   geom_point() +
   geom_abline() +
-  theme_bw() +
   xlim(0, 1.1 * max(sampleSim20$pi_i_approx)) +
   ylim(0, 1.1 * max(sampleSim20$pi_i_sim)) +
   xlab(bquote("approximate" ~ pi[i])) +
@@ -188,12 +183,12 @@ stands %>%
 In each sample stand we are installing a systematic random sample of 1/15 acre circular plots. On each plot we are estimating the cubic foot volume of the living trees. This is the second stage of our two-stage sample. We are simulating plots using a truncated normal distribution based on the true mean and coefficient of variation of each stand. We are using a truncated normal distribution with a lower limit of 0 since it is not possible to observe negative volume!
 ```{r samplePlots}
 plotTab <- sampStands %>%
-  group_by(id) %>%
+  rowwise() %>%
   mutate(
     cuftObs = list(
       truncnorm::rtruncnorm(
-        a = 0, # biological minimum
-        b = 6000, # biological maximum
+        a = -Inf, # biological minimum
+        b = Inf, # biological maximum
         n = nPlots,
         mean = cuftPerAc,
         sd = (cv / 100) * cuftPerAc
@@ -214,7 +209,7 @@ We can start by summarizing the stand-level estimates. For each stand we will es
 ```{r standStats}
 standDat <- plotTab %>%
   left_join(
-    sampStands %>% select(id, acres),
+    sampStands %>% select(id, acres, cuftPerAc),
     by = "id"
   ) %>%
   group_by(id, acres) %>%
@@ -225,6 +220,7 @@ standDat <- plotTab %>%
     sdObs = sd(cuftObs),
     nPlots = n()
   )
+
 ```
 
 ### Population-level estimate
@@ -251,7 +247,7 @@ where $\pi_{ik}$ is the joint inclusion probability for primary sampling units $
 $\pi_{ik}$ is approximated using this equation:
 
 $$
-$\pi_{ik}$ = \pi_{i} + \pi_{k} - (1 - (1 - p_{i} - p_{k})^n)
+\pi_{ik} = \pi_{i} + \pi_{k} - (1 - (1 - p_{i} - p_{k})^n)
 $$
 
 We will extend the estimate of population variance ($\hat{V}(\hat{t}_{HT})$) to obtain a standard error and 90% confidence interval for the population.
@@ -388,8 +384,8 @@ simulate_HT <- function(sims, stands, nStands,
           mutate(
             cuftObs = list(
               truncnorm::rtruncnorm(
-                a = 0, # biological minimum
-                b = 6000, # biological maximum
+                a = -Inf, # biological minimum
+                b = Inf,
                 n = nPlots,
                 mean = cuftPerAc,
                 sd = (cv / 100) * cuftPerAc

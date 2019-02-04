@@ -1,5 +1,5 @@
 ---
-title: "Forest Sampling: Application of Horvitz-Thompson estimators in a two stage sample"
+title: "Forest Inventory: Application of Horvitz-Thompson estimators in a two stage sample"
 author: "Henry Rodman"
 date: "2019-02-04"
 categories: ["R"]
@@ -26,13 +26,11 @@ output:
 <pre class="r"><code># simulate a population of stands
 stands &lt;- tibble(id = 1:100) %&gt;%
   mutate(
-    acres = truncnorm::rtruncnorm(
-      n = 100, a = 1, b = 400,
-      mean = 80, sd = 30
+    acres = runif(
+      n = 100, min = 1, max = 400
     ),
-    age = truncnorm::rtruncnorm(
-      n = 100, a = 10, b = 150,
-      mean = 70, sd = 20
+    age = runif(
+      n = 100, min = 10, max = 150
     ),
     cv = runif(n = 100, min = 10, max = 100)
   ) %&gt;%
@@ -40,8 +38,7 @@ stands &lt;- tibble(id = 1:100) %&gt;%
     cuftPerAc = 3000 *
       1 / (1 + exp(-(age - 40) / 15)) +
       rnorm(n = 100, mean = 0, sd = 300),
-    # cuftPerAc = 50 * age +
-    #   rnorm(n = 100, mean = 0, sd = 600),
+    cuftPerAc = ifelse(cuftPerAc &lt; 0, 0, cuftPerAc),
     cuftTot = cuftPerAc * acres
   )
 
@@ -61,7 +58,7 @@ stands %&gt;%
   geom_point() +
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;)) +
   labs(caption = &quot;volume over age for the forest&quot;)</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2476 cubic feet per acre, the population total is 2.010312110^{7} cubic feet!</p>
+<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2306 cubic feet per acre, the population total is 4.687976610^{7} cubic feet!</p>
 </div>
 <div id="designing-a-sample" class="section level2">
 <h2>Designing a sample</h2>
@@ -77,9 +74,8 @@ stands %&gt;%
 \pi_{i} = n * p_{i}
 \]</span></p>
 <p>where <span class="math inline">\(p_{i}\)</span> is the sampling weight for the <span class="math inline">\(i\)</span>th primary sample unit. This works fine when sampling with replacement, but sampling without replacement is slightly more complicated. The probability of including the <span class="math inline">\(i\)</span>th element on the <span class="math inline">\(k\)</span>th draw depends on the elements that were drawn in all draws <span class="math inline">\(1:k\)</span>. The distinction between <span class="math inline">\(p_{i}\)</span> and <span class="math inline">\(\pi_{i}\)</span> is very important. Think of <span class="math inline">\(\pi_{i}\)</span> as the likelihood of including the <span class="math inline">\(i\)</span>th element unconditional on the other elements selected in the sample. This can be calculated by computing the proportion of all possible samples where an element is selected but that sounds very difficult. Instead we will use the power of simulation to obtain an approximation of <span class="math inline">\(\pi_{i}\)</span> for each stand.</p>
-<pre class="r"><code>stands$prop &lt;- sqrt(stands$cuftPerAc) *
-  stands$acres /
-  sum(sqrt(stands$cuftPerAc) * stands$acres)
+<pre class="r"><code>stands$prop &lt;- (stands$cuftPerAc * stands$acres) /
+  sum(stands$cuftPerAc * stands$acres)
 
 simulate_sample &lt;- function(sims, stands, nSamp) {
   bind_rows(
@@ -109,7 +105,6 @@ sampleSim20 %&gt;%
   ggplot(aes(x = pi_i_approx, y = pi_i_sim)) +
   geom_point() +
   geom_abline() +
-  theme_bw() +
   xlim(0, 1.1 * max(sampleSim20$pi_i_approx)) +
   ylim(0, 1.1 * max(sampleSim20$pi_i_sim)) +
   xlab(bquote(&quot;approximate&quot; ~ pi[i])) +
@@ -163,12 +158,12 @@ stands %&gt;%
 <h3>Measure plots</h3>
 <p>In each sample stand we are installing a systematic random sample of 1/15 acre circular plots. On each plot we are estimating the cubic foot volume of the living trees. This is the second stage of our two-stage sample. We are simulating plots using a truncated normal distribution based on the true mean and coefficient of variation of each stand. We are using a truncated normal distribution with a lower limit of 0 since it is not possible to observe negative volume!</p>
 <pre class="r"><code>plotTab &lt;- sampStands %&gt;%
-  group_by(id) %&gt;%
+  rowwise() %&gt;%
   mutate(
     cuftObs = list(
       truncnorm::rtruncnorm(
-        a = 0, # biological minimum
-        b = 6000, # biological maximum
+        a = -Inf, # biological minimum
+        b = Inf, # biological maximum
         n = nPlots,
         mean = cuftPerAc,
         sd = (cv / 100) * cuftPerAc
@@ -188,7 +183,7 @@ stands %&gt;%
 <p>We can start by summarizing the stand-level estimates. For each stand we will estimate the total volume using the mean volume per acre from the sample and the total acres of each stand. We will also compute the sample variance and estimate the total variance for each stand.</p>
 <pre class="r"><code>standDat &lt;- plotTab %&gt;%
   left_join(
-    sampStands %&gt;% select(id, acres),
+    sampStands %&gt;% select(id, acres, cuftPerAc),
     by = &quot;id&quot;
   ) %&gt;%
   group_by(id, acres) %&gt;%
@@ -218,7 +213,7 @@ stands %&gt;%
 <p>where <span class="math inline">\(\pi_{ik}\)</span> is the joint inclusion probability for primary sampling units <span class="math inline">\(i\)</span> and <span class="math inline">\(k\)</span>.</p>
 <p><span class="math inline">\(\pi_{ik}\)</span> is approximated using this equation:</p>
 <p><span class="math display">\[
-$\pi_{ik}$ = \pi_{i} + \pi_{k} - (1 - (1 - p_{i} - p_{k})^n)
+\pi_{ik} = \pi_{i} + \pi_{k} - (1 - (1 - p_{i} - p_{k})^n)
 \]</span></p>
 <p>We will extend the estimate of population variance (<span class="math inline">\(\hat{V}(\hat{t}_{HT})\)</span>) to obtain a standard error and 90% confidence interval for the population.</p>
 <p>There is one component of the variance calculation where each observation must be compared to the rest of the observations in the sample. There may be a more elegant way to code that part, but for now this is what I have come up with:</p>
@@ -345,8 +340,8 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
           mutate(
             cuftObs = list(
               truncnorm::rtruncnorm(
-                a = 0, # biological minimum
-                b = 6000, # biological maximum
+                a = -Inf, # biological minimum
+                b = Inf,
                 n = nPlots,
                 mean = cuftPerAc,
                 sd = (cv / 100) * cuftPerAc
@@ -505,12 +500,12 @@ pander::pander(
   missing = &quot;-&quot;,
   emphasize.strong.rows = which(outTable$source == &quot;truth&quot;)
 )</code></pre>
-<table style="width:74%;">
+<table style="width:75%;">
 <colgroup>
 <col width="16%" />
 <col width="13%" />
 <col width="15%" />
-<col width="11%" />
+<col width="12%" />
 <col width="16%" />
 </colgroup>
 <thead>
@@ -526,49 +521,49 @@ pander::pander(
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">10</td>
-<td align="center">2569</td>
-<td align="center">436.8</td>
-<td align="center">0.99</td>
+<td align="center">2313</td>
+<td align="center">393</td>
+<td align="center">1</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">20</td>
-<td align="center">2560</td>
-<td align="center">216.1</td>
-<td align="center">0.94</td>
+<td align="center">2303</td>
+<td align="center">209.8</td>
+<td align="center">0.98</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">30</td>
-<td align="center">2563</td>
-<td align="center">168.3</td>
-<td align="center">0.83</td>
+<td align="center">2295</td>
+<td align="center">171.8</td>
+<td align="center">0.98</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">40</td>
-<td align="center">2560</td>
-<td align="center">148.3</td>
-<td align="center">0.89</td>
+<td align="center">2298</td>
+<td align="center">152</td>
+<td align="center">1</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">50</td>
-<td align="center">2561</td>
-<td align="center">133.2</td>
-<td align="center">0.81</td>
+<td align="center">2305</td>
+<td align="center">131.6</td>
+<td align="center">0.96</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">60</td>
-<td align="center">2569</td>
-<td align="center">117.2</td>
-<td align="center">0.68</td>
+<td align="center">2303</td>
+<td align="center">108.2</td>
+<td align="center">0.93</td>
 </tr>
 <tr class="odd">
 <td align="center"><strong>truth</strong></td>
 <td align="center"><strong>-</strong></td>
-<td align="center"><strong>2476</strong></td>
+<td align="center"><strong>2306</strong></td>
 <td align="center"><strong>-</strong></td>
 <td align="center"><strong>-</strong></td>
 </tr>
