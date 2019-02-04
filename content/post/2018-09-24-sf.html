@@ -1,0 +1,214 @@
+---
+title: "Geospatial Analysis in R: getting started with the sf package"
+author: "Henry Rodman"
+date: "2018-09-24"
+categories: ["R"]
+tags: ["sf", "geospatial"]
+
+output:
+  md_document:
+    variant: markdown_github
+    fig_width: 7
+    preserve_yaml: true
+---
+
+
+
+<p>The <strong>sf</strong> package is the successor to the common suite of geospatial analysis packages for R: sp, rgdal, and rgeos. This is a good thing because sf provides a unified solution to most of the geospatial operations that are often used within R.</p>
+<p>The way you interact with spatial data in the sf universe is more intuitive than in the past because the structure of the sf class in R is very simple relative to the sp class. An object of the sf class consists of a normal data.frame with a geometry column that contains the geometry for each feature. That may not sound very exciting, but it makes for a much easier time when manipulating and summarizing spatial data.</p>
+<p>If you are interested in the history and rationale for implementing the sf package, there are several enlightening blog posts and vignettes on the sf <a href="https://github.com/r-spatial/sf#blogs-presentations-vignettes-sp-sf-wiki">github page</a>. I also found this <a href="https://geocompr.robinlovelace.net/">guide</a> very helpful for understanding the sf workflow.</p>
+<div id="installation" class="section level3">
+<h3>Installation</h3>
+<p>Installing sf can be difficult while you align the system dependencies, but there are some steps outlined on the package <a href="https://github.com/r-spatial/sf#installing">readme</a> that seem to work. The main system packages are GDAL, GEOS, PROJ. If your machine is already set up with geospatial software (e.g. QGIS) you probably have these installed already. For best results follow the installation instructions on github.</p>
+</div>
+<div id="fire-it-up" class="section level3">
+<h3>Fire it up</h3>
+<p>For this demo I am loading the tidyverse package which attaches my preferred set of data manipulation and visualization packages. I am also attaching the package ‘spData’ which contains some useful spatial datasets for demonstration.</p>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ────────────────────────────────── tidyverse 1.2.1 ──</code></pre>
+<pre><code>## ✔ ggplot2 3.1.0     ✔ purrr   0.2.5
+## ✔ tibble  2.0.1     ✔ dplyr   0.7.8
+## ✔ tidyr   0.8.2     ✔ stringr 1.3.1
+## ✔ readr   1.3.1     ✔ forcats 0.3.0</code></pre>
+<pre><code>## Warning: package &#39;tibble&#39; was built under R version 3.5.2</code></pre>
+<pre><code>## ── Conflicts ───────────────────────────────────── tidyverse_conflicts() ──
+## ✖ dplyr::filter() masks stats::filter()
+## ✖ dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(sf)</code></pre>
+<pre><code>## Linking to GEOS 3.6.3, GDAL 2.2.3, PROJ 5.1.0</code></pre>
+<pre class="r"><code>library(spData)</code></pre>
+</div>
+<div id="download-some-data" class="section level3">
+<h3>Download some data</h3>
+<p>The ecological supersections make a cool spatial dataset that describe large ecological provinces across the continental US.</p>
+<pre class="r"><code># import supersection shapefile
+if(!file.exists(&quot;/tmp/gis-supersection-shape-file.zip&quot;)) {
+  download.file(url = &quot;https://www.arb.ca.gov/cc/capandtrade/protocols/usforest/2014/supersectionshapefiles/gis-supersection-shape-file.zip&quot;,
+                destfile = &quot;/tmp/gis-supersection-shape-file.zip&quot;)
+  
+}
+
+unzip(zipfile = &quot;/tmp/gis-supersection-shape-file.zip&quot;, exdir = &quot;/tmp/super&quot;)
+superFile &lt;- &quot;/tmp/super/Supersections/Supersections.shp&quot;</code></pre>
+</div>
+<div id="reading-in-spatial-data" class="section level3">
+<h3>Reading in spatial data</h3>
+<p>The shapefile can be read in using the function <code>st_read</code> and projected to EPSG:4326 using the function <code>st_transform</code>. Notice that you can use pipes and the tidyverse framework on objects of the <code>sf</code> class! <code>st_read</code> can also handle alternative file formats such as geojson and GeoPackage (.gpkg).</p>
+<pre class="r"><code>supersectionShape &lt;- st_read(dsn = superFile) %&gt;%
+  st_simplify(dTolerance = 2000) %&gt;%
+  st_transform(crs = 4326)</code></pre>
+<pre><code>## Reading layer `Supersections&#39; from data source `/private/tmp/super/Supersections/Supersections.shp&#39; using driver `ESRI Shapefile&#39;
+## Simple feature collection with 95 features and 5 fields
+## geometry type:  MULTIPOLYGON
+## dimension:      XY
+## bbox:           xmin: -2355031 ymin: 269687.9 xmax: 2257506 ymax: 3165565
+## epsg (SRID):    NA
+## proj4string:    +proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs</code></pre>
+</div>
+<div id="data-structure" class="section level3">
+<h3>Data structure</h3>
+<p>To understand why sf makes the world a better place, take a look at the class of <code>supersectionShape</code>. It’s an object of class <code>sf</code> and <code>data.frame</code>!</p>
+<pre class="r"><code>class(supersectionShape)</code></pre>
+<pre><code>## [1] &quot;sf&quot;         &quot;data.frame&quot;</code></pre>
+<p>The <code>data.frame</code> structure of an sf object is also very convenient.</p>
+<pre class="r"><code>head(supersectionShape)</code></pre>
+<pre><code>## Simple feature collection with 6 features and 5 fields
+## geometry type:  GEOMETRY
+## dimension:      XY
+## bbox:           xmin: -123.5988 ymin: 42.08068 xmax: -98.82367 ymax: 48.99995
+## epsg (SRID):    4326
+## proj4string:    +proj=longlat +datum=WGS84 +no_defs
+##          AREA PERIMETER    ACRES                 SSection SS_Name2
+## 1 30741682875 1404657.1  7596137        Okanogan Highland     &lt;NA&gt;
+## 2 28793819858 1201969.9  7114983       Northwest Cascades     &lt;NA&gt;
+## 3 17147017863 3335379.1  4237070             Puget Trough     &lt;NA&gt;
+## 4 21883664760  790723.2  5407398 Northern Rocky Mountains     &lt;NA&gt;
+## 5 41675060546 1252913.5 10297621    Northern Great Plains     &lt;NA&gt;
+## 6 69771019667 2634088.8 17240259           Columbia Basin     &lt;NA&gt;
+##                         geometry
+## 1 POLYGON ((-116.232 48.1383,...
+## 2 POLYGON ((-122.846 44.13205...
+## 3 MULTIPOLYGON (((-123.4378 4...
+## 4 POLYGON ((-114.798 47.53692...
+## 5 POLYGON ((-111.5483 47.1628...
+## 6 POLYGON ((-118.4671 45.6895...</code></pre>
+</div>
+<div id="plotting" class="section level3">
+<h3>Plotting</h3>
+<p>sf objects can be plotted using base R plotting methods, but the <code>ggplot</code> method creates really nice looking maps with a familiar interface to many users.</p>
+<pre class="r"><code>ggplot() +
+  geom_sf(data = supersectionShape,
+          size = 0.5,
+          color = &quot;black&quot;,
+          alpha = 0) +
+  theme_bw() +
+  coord_sf() +
+  labs(title = &quot;Ecological Supersections&quot;,
+       subtitle = &quot;Map of the ecological supersections in the continental US&quot;,
+       caption = &quot;Source: CA ARB&quot;)</code></pre>
+<div class="figure"><span id="fig:ggplotting"></span>
+<img src="/post/2018-09-24-sf_files/figure-html/ggplotting-1.png" alt="Map of ecological supersections in continental US" width="672" />
+<p class="caption">
+Figure 1: Map of ecological supersections in continental US
+</p>
+</div>
+</div>
+<div id="geospatial-joins" class="section level3">
+<h3>Geospatial joins</h3>
+<p>Spatial joins operations (e.g. clip, overlay, etc) are very easy to perform in the sf framework. If two vector layers share the same projection, the function <code>st_join</code> can be used very effectively.</p>
+<p>Let’s look at the relationships between ecological supersections and the US states. First, we need to make sure that the <code>us_states</code> sf object shares the projection EPSG:4326. We use the function <code>st_crs</code> for that.</p>
+<pre class="r"><code>st_crs(us_states)</code></pre>
+<pre><code>## Coordinate Reference System:
+##   EPSG: 4269 
+##   proj4string: &quot;+proj=longlat +datum=NAD83 +no_defs&quot;</code></pre>
+<pre class="r"><code>st_crs(supersectionShape)</code></pre>
+<pre><code>## Coordinate Reference System:
+##   EPSG: 4326 
+##   proj4string: &quot;+proj=longlat +datum=WGS84 +no_defs&quot;</code></pre>
+<pre class="r"><code>st_crs(us_states) == st_crs(supersectionShape)</code></pre>
+<pre><code>## [1] FALSE</code></pre>
+<p>It does not share the same projection, so we are going to need to reproject before we perform any spatial joins.</p>
+<p>If we want to know which supersections are present in the state of Minnesota, we can perform a spatial join to answer that question. The type of join performed by <code>st_join</code> defaults to “intersect” (<code>st_intersect</code>), but can be set to one of these instead: <code>st_disjoint</code>, <code>st_touches</code>, <code>st_crosses</code>, <code>st_within</code>, <code>st_contains</code>, <code>st_overlaps</code>, <code>st_covers</code>, <code>st_covered_by</code>, <code>st_equals</code>, or <code>st_equals_exact</code>.</p>
+<pre class="r"><code>mnSupersections &lt;- supersectionShape %&gt;%
+  st_join(st_transform(us_states, crs = 4326),
+          join = st_intersects) %&gt;%
+  filter(NAME == &quot;Minnesota&quot;)</code></pre>
+<pre><code>## although coordinates are longitude/latitude, st_intersects assumes that they are planar</code></pre>
+<pre class="r"><code>mn &lt;- us_states %&gt;%
+  filter(NAME == &quot;Minnesota&quot;)</code></pre>
+<pre class="r"><code>ggplot() +
+  geom_sf(data = mn,
+          size = 0.5,
+          fill = &quot;blue&quot;,
+          alpha = 0.2) +
+  geom_sf(data = mnSupersections,
+          size = 0.5,
+          color = &quot;black&quot;,
+          alpha = 0) +
+  theme_bw() +
+  coord_sf() +
+  labs(title = &quot;Ecological Supersections in MN&quot;,
+       subtitle = &quot;Map of the ecological supersections in Minnesota&quot;,
+       caption = &quot;Source: CA ARB&quot;)</code></pre>
+<p><img src="/post/2018-09-24-sf_files/figure-html/mnPlots-1.png" width="672" /></p>
+</div>
+<div id="dissolving" class="section level3">
+<h3>Dissolving</h3>
+<p><code>sf</code> objects can be dissolved by common attributes if desired, or dissolved completely using the <code>group_by</code> and <code>summarize</code> logic from dplyr.</p>
+<pre class="r"><code>regions &lt;- us_states %&gt;%
+  group_by(REGION) %&gt;%
+  summarize()
+
+ggplot() +
+  geom_sf(data = regions,
+          aes(fill = REGION),
+          size = 0.5,
+          color = &quot;black&quot;,
+          alpha = 1) +
+  theme_bw() +
+  coord_sf()</code></pre>
+<p><img src="/post/2018-09-24-sf_files/figure-html/dissolve-1.png" width="672" /></p>
+</div>
+<div id="bonus-working-with-rasters" class="section level3">
+<h3>Bonus: working with rasters</h3>
+<p>Operations between rasters and <code>sf</code> objects are the same as before: load the raster using the raster package, summarize/extract raster data to vector layer using the <code>extract</code> function. Look for an update to this post once I see if there is a tidy way to summarize rasters within the piping framework!</p>
+<pre class="r"><code># download low resolution climate rasters
+if(!file.exists(&quot;/tmp/climate-rasts.zip&quot;)) {
+  download.file(url = &quot;http://biogeo.ucdavis.edu/data/worldclim/v2.0/tif/base/wc2.0_10m_tavg.zip&quot;,
+                destfile = &quot;/tmp/climate-rasts.zip&quot;)
+  
+}
+
+unzip(zipfile = &quot;/tmp/climate-rasts.zip&quot;, exdir = &quot;/tmp/climate-rasts&quot;)
+rasts &lt;- list.files(&quot;/tmp/climate-rasts&quot;, full.names = TRUE)</code></pre>
+<p>The climate rasters downloaded in the previous step represent the mean temperature by month at ~340 km2 resolution. For a real analysis, we would want the weighted mean temperature for each polygon (weighted on proportion of each raster cell falling within each polygon), but that takes a lot longer so we will just get the mean of intersecting cells.</p>
+<pre class="r"><code>janTemp &lt;- raster::raster(rasts[grepl(&quot;tavg_01.tif&quot;, rasts)])
+
+# reproject supersection shape to match raster
+supersectionShape2 &lt;- st_transform(supersectionShape,
+                                   crs = raster::projection(janTemp))
+
+# extract mean temp (C) for month of January for each polygon
+janTemp &lt;- raster::extract(janTemp,
+                           as(supersectionShape2, &quot;Spatial&quot;),
+                           fun = mean, weights = FALSE,
+                           na.rm = TRUE)
+
+supersectionShape2$janTemp &lt;- janTemp
+
+janPlot &lt;- ggplot() +
+  geom_sf(data = supersectionShape2,
+          aes(fill = janTemp),
+          size = 0.5,
+          color = &quot;black&quot;,
+          alpha = 1) +
+  scale_fill_gradient2(high = &quot;red&quot;, low = &quot;blue&quot;,
+                       name = &quot;Mean Temp (C)&quot;) +
+  theme_bw() +
+  coord_sf() +
+  labs(title = &quot;Temperature across Ecological Supersections&quot;,
+       subtitle = &quot;Mean January temperature (C) by ecological supersection&quot;,
+       caption = &quot;Source: CA ARB, WorldClim 2.0&quot;)</code></pre>
+<p>Mapping mean temp in January confirms what we already knew: Minnesota is cold!</p>
+<p><img src="/post/2018-09-24-sf_files/figure-html/meanJanTemp-1.png" width="672" /></p>
+</div>
