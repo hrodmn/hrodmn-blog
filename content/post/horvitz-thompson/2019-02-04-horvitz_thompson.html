@@ -3,13 +3,11 @@ title: "Forest Inventory: Application of Horvitz-Thompson estimators in a two st
 author: "Henry Rodman"
 date: "2019-02-04"
 categories: ["R"]
+slug: "two-stage-horvitz-thompson"
 tags: ["statistics", "sampling", "forestry", "biometrics"]
-
-output:
-  md_document:
-    variant: markdown_github
-    fig_width: 7
-    preserve_yaml: true
+header:
+  image: "headers/jefferson.jpg"
+  preview: TRUE
 ---
 
 
@@ -58,7 +56,7 @@ stands %&gt;%
   geom_point() +
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;)) +
   labs(caption = &quot;volume over age for the forest&quot;)</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2299 cubic feet per acre, the population total is 4.60468410^{7} cubic feet!</p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2220 cubic feet per acre, the population total is 4.15640910^{7} cubic feet!</p>
 </div>
 <div id="designing-a-sample" class="section level2">
 <h2>Designing a sample</h2>
@@ -110,7 +108,7 @@ sampleSim20 %&gt;%
   ylim(0, 1.1 * max(sampleSim20$pi_i_sim)) +
   xlab(bquote(&quot;approximate&quot; ~ pi[i])) +
   ylab(bquote(&quot;simulated&quot; ~ pi[i]))</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleSimulation-1.png" width="672" /> As you can see, there are subtle differences between the approximate <span class="math inline">\(\pi_{i}\)</span> values and the <span class="math inline">\(\pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/sampleSimulation-1.png" width="672" /> As you can see, there are subtle differences between the approximate <span class="math inline">\(\pi_{i}\)</span> values and the <span class="math inline">\(\pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
 <p>By plotting <span class="math inline">\(\pi_{i}\)</span> in volume and stand acreage space we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.</p>
 <pre class="r"><code>sampleSim20 %&gt;%
   left_join(stands) %&gt;%
@@ -126,7 +124,7 @@ sampleSim20 %&gt;%
     name = bquote(&quot;simulated&quot; ~ pi[i])
   )</code></pre>
 <pre><code>## Joining, by = c(&quot;id&quot;, &quot;prop&quot;)</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/samplingProbabilityField-1.png" width="672" /></p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/samplingProbabilityField-1.png" width="672" /></p>
 <p>Now we are going to step through a sample of the population.</p>
 <pre class="r"><code>acresPerPlot &lt;- 8
 
@@ -156,7 +154,7 @@ stands %&gt;%
     aes(x = acres, y = cuftPerAc, color = sampled)
   ) +
   geom_point()</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleStands-1.png" width="672" /></p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/sampleStands-1.png" width="672" /></p>
 </div>
 </div>
 <div id="measure-plots" class="section level3">
@@ -303,7 +301,7 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
   ylim(0, max(standDat$meanObs) * 1.5) +
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;))</code></pre>
 <pre><code>## Warning: Removed 1 rows containing missing values (geom_errorbar).</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleEstimates-1.png" width="672" /></p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/sampleEstimates-1.png" width="672" /></p>
 </div>
 </div>
 </div>
@@ -353,7 +351,7 @@ simStats &lt;- simFrame %&gt;%
   )</code></pre>
 <pre><code>## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
 <pre><code>## Warning: Removed 12 rows containing missing values (geom_bar).</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot1-1.png" width="672" /></p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot1-1.png" width="672" /></p>
 <p>The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates, but the precision of estimates increases substantially as we sample more stands.</p>
 <pre class="r"><code>simFrame %&gt;%
   group_by(nObs) %&gt;%
@@ -378,7 +376,7 @@ simStats &lt;- simFrame %&gt;%
     max(simFrame$meanCuft) +
       max(simFrame$ci90MeanCuft)
   )</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot2-1.png" width="672" /></p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot2-1.png" width="672" /></p>
 <p>Based on the criteria we set for acceptable precision (+/- 10% of mean at 90% confidence), we should be able to get by with a sample of 20 stands!</p>
 <pre class="r"><code>outTable &lt;- simStats %&gt;%
   bind_rows(truth %&gt;% select(source, meanCuft)) %&gt;%
@@ -414,49 +412,49 @@ pander::pander(
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">10</td>
-<td align="center">2307</td>
-<td align="center">391.9</td>
+<td align="center">2202</td>
+<td align="center">374.7</td>
 <td align="center">1</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">20</td>
-<td align="center">2292</td>
-<td align="center">212.3</td>
-<td align="center">0.98</td>
+<td align="center">2224</td>
+<td align="center">202</td>
+<td align="center">1</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">30</td>
-<td align="center">2286</td>
-<td align="center">174.8</td>
-<td align="center">0.99</td>
+<td align="center">2218</td>
+<td align="center">165</td>
+<td align="center">0.98</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">40</td>
-<td align="center">2295</td>
-<td align="center">154.2</td>
-<td align="center">0.99</td>
+<td align="center">2224</td>
+<td align="center">145.9</td>
+<td align="center">0.98</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">50</td>
-<td align="center">2298</td>
-<td align="center">131.9</td>
-<td align="center">0.99</td>
+<td align="center">2225</td>
+<td align="center">126.4</td>
+<td align="center">0.97</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">60</td>
-<td align="center">2290</td>
-<td align="center">107</td>
-<td align="center">0.93</td>
+<td align="center">2229</td>
+<td align="center">104.8</td>
+<td align="center">0.99</td>
 </tr>
 <tr class="odd">
 <td align="center"><strong>truth</strong></td>
 <td align="center"><strong>-</strong></td>
-<td align="center"><strong>2299</strong></td>
+<td align="center"><strong>2220</strong></td>
 <td align="center"><strong>-</strong></td>
 <td align="center"><strong>-</strong></td>
 </tr>
