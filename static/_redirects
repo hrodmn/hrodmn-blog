@@ -1,1 +1,3 @@
 http://hrodmn.rbind.io/*    https://hrodmn.rbind.io/:splat  301!
+http://hrodmn.netlify.com/*   https://hrodmn.rbind.io/:splat  301!
+https://hrodmn.netlify.com/*   https://hrodmn.rbind.io/:splat  301!
