@@ -12,6 +12,6 @@ feature:
   name: Statistics
 subtitle: ""
 title: Skills
-weight: 7
+weight: 4
 widget: featurette
 ---

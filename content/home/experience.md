@@ -12,6 +12,6 @@ experience:
   title: biometrician
 subtitle: ""
 title: Experience
-weight: 8
+weight: 3
 widget: experience
 ---

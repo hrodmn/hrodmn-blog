@@ -7,7 +7,6 @@ filter_tag: ""
 list_format: 2
 subtitle: ""
 title: Recent Posts
-weight: 40
+weight: 1
 widget: posts
 ---
-
