@@ -58,7 +58,7 @@ stands %&gt;%
   geom_point() +
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;)) +
   labs(caption = &quot;volume over age for the forest&quot;)</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2523 cubic feet per acre, the population total is 4.54931310^{7} cubic feet!</p>
+<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2299 cubic feet per acre, the population total is 4.60468410^{7} cubic feet!</p>
 </div>
 <div id="designing-a-sample" class="section level2">
 <h2>Designing a sample</h2>
@@ -110,8 +110,8 @@ sampleSim20 %&gt;%
   ylim(0, 1.1 * max(sampleSim20$pi_i_sim)) +
   xlab(bquote(&quot;approximate&quot; ~ pi[i])) +
   ylab(bquote(&quot;simulated&quot; ~ pi[i]))</code></pre>
-<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleSimulation-1.png" width="672" /> As you can see, there are subtle differences between the approximate <span class="math inline">\(pi_{i}\)</span> values and the <span class="math inline">\(pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
-<p>By plotting <span class="math inline">\(pi_{i}\)</span> in volume and stand acreage space we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.</p>
+<p><img src="/post/2019-02-04-horvitz_thompson_files/figure-html/sampleSimulation-1.png" width="672" /> As you can see, there are subtle differences between the approximate <span class="math inline">\(\pi_{i}\)</span> values and the <span class="math inline">\(\pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
+<p>By plotting <span class="math inline">\(\pi_{i}\)</span> in volume and stand acreage space we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.</p>
 <pre class="r"><code>sampleSim20 %&gt;%
   left_join(stands) %&gt;%
   ggplot(
@@ -414,49 +414,49 @@ pander::pander(
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">10</td>
-<td align="center">2534</td>
-<td align="center">431.5</td>
+<td align="center">2307</td>
+<td align="center">391.9</td>
 <td align="center">1</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">20</td>
-<td align="center">2520</td>
-<td align="center">230.9</td>
-<td align="center">0.99</td>
+<td align="center">2292</td>
+<td align="center">212.3</td>
+<td align="center">0.98</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">30</td>
-<td align="center">2527</td>
-<td align="center">188.9</td>
-<td align="center">1</td>
+<td align="center">2286</td>
+<td align="center">174.8</td>
+<td align="center">0.99</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">40</td>
-<td align="center">2533</td>
-<td align="center">166.4</td>
+<td align="center">2295</td>
+<td align="center">154.2</td>
 <td align="center">0.99</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">50</td>
-<td align="center">2531</td>
-<td align="center">143.8</td>
-<td align="center">0.97</td>
+<td align="center">2298</td>
+<td align="center">131.9</td>
+<td align="center">0.99</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">60</td>
-<td align="center">2528</td>
-<td align="center">118.9</td>
-<td align="center">0.97</td>
+<td align="center">2290</td>
+<td align="center">107</td>
+<td align="center">0.93</td>
 </tr>
 <tr class="odd">
 <td align="center"><strong>truth</strong></td>
 <td align="center"><strong>-</strong></td>
-<td align="center"><strong>2523</strong></td>
+<td align="center"><strong>2299</strong></td>
 <td align="center"><strong>-</strong></td>
 <td align="center"><strong>-</strong></td>
 </tr>

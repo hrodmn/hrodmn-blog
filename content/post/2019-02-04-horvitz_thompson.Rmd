@@ -133,9 +133,9 @@ sampleSim20 %>%
   xlab(bquote("approximate" ~ pi[i])) +
   ylab(bquote("simulated" ~ pi[i]))
 ```
-As you can see, there are subtle differences between the approximate $pi_{i}$ values and the $pi_{i}$ values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.
+As you can see, there are subtle differences between the approximate $\pi_{i}$ values and the $\pi_{i}$ values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.
 
-By plotting $pi_{i}$ in volume and stand acreage space we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.
+By plotting $\pi_{i}$ in volume and stand acreage space we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.
 ```{r samplingProbabilityField}
 sampleSim20 %>%
   left_join(stands) %>%
