@@ -3,13 +3,11 @@ title: "Forest Inventory: Application of Horvitz-Thompson estimators in a two st
 author: "Henry Rodman"
 date: "2019-02-04"
 categories: ["R"]
+slug: "two-stage-horvitz-thompson"
 tags: ["statistics", "sampling", "forestry", "biometrics"]
-
-output:
-  md_document:
-    variant: markdown_github
-    fig_width: 7
-    preserve_yaml: true
+header:
+  image: "headers/jefferson.jpg"
+  preview: TRUE
 ---
 
 ```{r setup, include=FALSE}
