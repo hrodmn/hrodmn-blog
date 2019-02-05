@@ -10,10 +10,6 @@ feature:
   icon: chart-line
   icon_pack: fas
   name: Statistics
-- description: 10%
-  icon: camera-retro
-  icon_pack: fas
-  name: Photography
 subtitle: ""
 title: Skills
 weight: 7
