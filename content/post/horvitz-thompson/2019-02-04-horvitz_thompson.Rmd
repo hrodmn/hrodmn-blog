@@ -36,7 +36,6 @@ I dug around the internet, textbooks, and through my old lecture notes from fore
 ## Objectives
 Let's say that I am a forest manager that needs an estimate of the volume of standing trees in a tract of forest land. I want to obtain an accurate estimate for the lowest price possible. I am willing to pay more for a more precise estimate, but do not need an estimate that is more precise than +/- 10% at 90% confidence. In statistical terms, I would like the half-width of the 90% confidence interval to be roughly 10% of the estimate of the total volume.
 
-
 ## Simulate the population
 The forest is composed of 100 stands of forest that vary in size, most of the stands are Douglas-fir plantations. In general, we expect that older stands have greater volume stocking than young stands. We will randomly assign an age, size in acres, coefficient of variation of volume within the stand, then assign the mean cubic feet per acre for the stand.
  
@@ -80,13 +79,13 @@ stands %>%
 ```
 The true population mean stocking is `r round(meanCuft)` cubic feet per acre, the population total is `r round(totalCuft)` cubic feet!
 
-## Designing a sample
-There are many ways to obtain an estimate of the total volume for the forest. The most expensive way would be to visit every tree in the forest, measuring several dimensions and estimating volume for every single tree. This would provide us with an accurate and precise estimate but would be time consuming and prohibitively expensive. We could also just guess the total based on what we know about the property. This would be very cheap today, but our estimate is likely to be inaccurate and will probably result in significant costs related to bad information down the road. Our best bet is to take a sample from the population. A simple random sample of 1/15 acre circular plots distributed across the property would be a fine way to sample the property, but we also want information about individual stands for planning purposes so we should do something else.
+## Designing a two-stage sample
+There are many ways to obtain an estimate of the total volume for the forest. The most expensive way would be to visit every tree in the forest, measuring several dimensions and estimating volume for every single tree. This would provide us with an accurate and precise estimate but would be time consuming and prohibitively expensive. We could also just guess the total based on what we know about the property. This would be very cheap today, but our estimate is likely to be inaccurate and will probably result in significant costs related to bad information down the road. Our best bet is to take a sample from the population. A simple random sample of 1/15 acre circular plots distributed across the property would be a fine way to sample the property, but traveling to each sample point could be very inefficient and we also want information about individual stands for planning purposes. We should do something besides a simple random sample.
 
-A double sample is an appealing option because we can obtain an accurate estimate of the population total while obtaining stand-level estimates that we will use for modeling forest growth and evaluating forest management options. We can also improve the precision of our estimates by sampling stands with weights that we expect to be correlated with our variable of interest (total volume).
+A two-stage sample is an appealing option because we can obtain an accurate estimate of the population total while obtaining stand-level estimates that we will use for modeling forest growth and evaluating forest management options. We can also improve the precision of our estimates by sampling stands with weights that we expect to be correlated with our variable of interest (total volume).
 
 ### Selecting stands
-The population of stands could be sampled randomly, but since we are trying to obtain an estimate of total volume for the property, we need to make sure that we sample the stands that a) contribute the most to the total volume, and b) contribute the most variance to the population. Using the Horvitz-Thompson estimators, we can sample the stands however we want so long as we know the probability of each stand being included in the sample! This is a case of _unequal probability sampling_ and the Horvitz-Thompson estimators will be statistically efficient if the probability of inclusion for each primary sampling unit is correlated with the variable of interest. In this case, we are going to weight our sample on age x acres since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume.
+The population of stands could be sampled randomly, but since we are trying to obtain an estimate of total volume for the property, we need to make sure that we sample the stands that a) contribute the most to the total volume, and b) contribute the most variance to the population. Using the Horvitz-Thompson estimators, we can sample the stands however we want so long as we know the probability of each stand being included in the sample! This is a case of unequal probability sampling and the Horvitz-Thompson estimators will be statistically efficient if the probability of inclusion for each primary sampling unit is correlated with the variable of interest. In this case, we are going to weight our sample on age x acres since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume.
 
 #### Inclusion probability
 Some references approximate $\pi_{i}$ using $n * p_{i}$ where $p_{i}$ is the sampling weight for the $i$th primary sample unit. This works fine when sampling with replacement, but sampling without replacement is slightly more complicated. The probability of including the $i$th element on the $k$th draw depends on the elements that were drawn in all draws $1:k$.
@@ -105,8 +104,7 @@ stands %>%
   
 ```
 
-We need to estimate the inclusion probabilities ($\pi_{i}$) for all stands as well as the joint inclusion probabilities ($\pi_{ij}$) for all pairs of stands. Most texts will describe $\pi_{ij}$ as a difficult variable to calculate, but we can obtain estimates using brute force simulation.
-
+We need to estimate the inclusion probabilities ($\pi_{i}$) for all stands as well as the joint inclusion probabilities ($\pi_{ij}$) for all pairs of stands. We can accomplish this with a simulation.
 ```{r inclusionProbablities}
 simulate_sample <- function(sims, stands, nSamp, cores) {
   simFrame <- bind_rows(
@@ -242,6 +240,7 @@ sampleSim20 %>%
 
 ```
 
+## Example sample
 Now we are going to step through a sample of the population.
 
 ```{r sampleStands}
@@ -280,6 +279,7 @@ stands %>%
 
 ### Measure plots
 In each sample stand we are installing a systematic random sample of 1/15 acre circular plots. On each plot we are estimating the cubic foot volume of the living trees. This is the second stage of our two-stage sample. We are simulating plots using a normal distribution based on the true mean and coefficient of variation of each stand.
+
 ```{r samplePlots}
 plotTab <- sampStands %>%
   rowwise() %>%
@@ -773,6 +773,7 @@ pander::pander(
   emphasize.strong.rows = which(outTableUnequal$source == "truth"),
   caption = "summary of equal probability sampling simulation"
 )
+
 ```
 
 The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.
