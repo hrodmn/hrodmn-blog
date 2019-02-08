@@ -411,9 +411,9 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
 <p>Though we may be stuck with it in real life, the result of a single sample is not very helpful for evaluating the performance of a sample design. To do that we will simulate many samples and evaluate the performance of various sampling intensities by assessing trends in precision and bias.</p>
 <p>We are simulating 100 samples for six sample intensities: 10, 20, and 30 stands out of the 100 in the population. Stands will be selected using the same probabilities as the example we walked through earlier.</p>
 <p>The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates and the precision of estimates increases substantially as we sample more stands. <img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot1-1.png" width="672" /></p>
-<p>The estimates appear to be very stable around the true mean, but the confidence intervals seem to overestimate the sample variance. We should expect ~10% of samples to yield a confidence interval that does not contain the true mean. This simulation suggests that there is a problem in the variance calculation.</p>
+<p>We expect ~90% of samples to yield a confidence interval that contains the true mean, this simulation gives the expected result. The results indicate that the half-width of the 90% confidence interval is about 10% of the mean when we sample 20 stands out of 100.</p>
 <table style="width:75%;">
-<caption>summary of unequal probability sampling simulation The results indicate that the half-width of the 90% confidence interval is about 10% of the mean when we sample 20 stands out of 100. Next, we are going to see how much more efficient the unequal probability sample is than a simple random sample for the first stage of sampling.</caption>
+<caption>summary of unequal probability sampling simulation</caption>
 <colgroup>
 <col width="16%" />
 <col width="13%" />
@@ -434,36 +434,37 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">10</td>
-<td align="center">2242</td>
-<td align="center">391</td>
-<td align="center">0.9082</td>
+<td align="center">2324</td>
+<td align="center">373</td>
+<td align="center">0.94</td>
 </tr>
 <tr class="even">
 <td align="center">estimate</td>
 <td align="center">20</td>
-<td align="center">2225</td>
-<td align="center">215.7</td>
+<td align="center">2349</td>
+<td align="center">230</td>
 <td align="center">0.91</td>
 </tr>
 <tr class="odd">
 <td align="center">estimate</td>
 <td align="center">30</td>
-<td align="center">2192</td>
-<td align="center">165.8</td>
-<td align="center">0.9</td>
+<td align="center">2350</td>
+<td align="center">167</td>
+<td align="center">0.93</td>
 </tr>
 <tr class="even">
 <td align="center"><strong>truth</strong></td>
 <td align="center"><strong>-</strong></td>
-<td align="center"><strong>2214</strong></td>
+<td align="center"><strong>2336</strong></td>
 <td align="center"><strong>-</strong></td>
 <td align="center"><strong>-</strong></td>
 </tr>
 </tbody>
 </table>
+<p>Next, we are going to see how much more efficient the unequal probability sample is than a simple random sample for the first stage of sampling.</p>
 </div>
 <div id="simple-random-sample" class="section level2">
-<h2>simple random sample</h2>
+<h2>Simple random sample</h2>
 <p>To run the same simulation using a simple random sample we just need to make the sample weights equal for all stands. We can use the same Horvitz-Thompson estimators since the only things we have changed are the inclusion probabilities.</p>
 </div>
 <div id="section" class="section level2">
@@ -471,12 +472,12 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
 <p>source # average 90% CI proportion sampled sample of CIs<br />
 stands cu. ft. containing per/ac true<br />
 mean<br />
-———– ——— ———- ——– ———— estimate 10 2177 880.8 0.88</p>
-<p>estimate 20 2255 566.5 0.92</p>
-<p>estimate 30 2174 413.5 0.89</p>
+———– ——— ———- ——– ———— estimate 10 2372 974 0.88</p>
+<p>estimate 20 2384 616 0.96</p>
+<p>estimate 30 2276 439 0.92</p>
 </div>
-<div id="truth---2214----" class="section level2">
-<h2><strong>truth</strong> <strong>-</strong> <strong>2214</strong> <strong>-</strong> <strong>-</strong></h2>
+<div id="truth---2336----" class="section level2">
+<h2><strong>truth</strong> <strong>-</strong> <strong>2336</strong> <strong>-</strong> <strong>-</strong></h2>
 <p>Table: summary of equal probability sampling simulation</p>
 <p>The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.</p>
 <p>We can see that the unequal probability sample yields much more stable estimates with higher precision. This demonstrates how we can save lots of time and energy with a bit of extra work during the sample design phase of a resource assessment project.</p>
