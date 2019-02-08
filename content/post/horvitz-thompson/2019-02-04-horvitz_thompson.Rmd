@@ -17,6 +17,10 @@ pander::panderOptions(
 pander::panderOptions(
   'table.split.table', Inf
 )
+knitr::opts_chunk$set(
+  cache = TRUE,
+  message = FALSE
+)
 
 library(tidyverse)
 theme_set(theme_bw())
@@ -313,7 +317,7 @@ where $S$ is the sample of primary sample units from population sized $N$
 The Sen-Yates-Grundy estimator for variance of the population total is:
 
 $$
-\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k \neq i}}
+\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k < i}}
 \displaystyle \frac{\pi_{ik} - \pi_{i}\pi_{k}}{\pi_{ik}} \left(\frac{\hat{t}_{i}}{\pi_{i}} - \frac{\hat{t}_{k}}{\pi_{k}}\right)^{2}+
 \sum_{i \in S} \displaystyle \frac{\hat{V}(\hat{t_{i}})}{\pi_{i}}
 $$
@@ -374,7 +378,8 @@ standDat %>%
   ggplot(aes(x = cuftTot, y = tHat)) +
   geom_point() +
   geom_errorbar(aes(ymin = tHat - 1.7 * se, ymax = tHat + 1.7 * se)) +
-  geom_abline()
+  geom_abline() +
+  xlab(bquote("true total volume (" ~ ft^{3} ~ ")"))
 
 ```
 
@@ -453,7 +458,7 @@ results %>%
 
 ## Simulate many samples
 Though we may be stuck with it in real life, the result of a single sample is not very helpful for evaluating the performance of a sample design. To do that we will simulate many samples and evaluate the performance of various sampling intensities by assessing trends in precision and bias.
-```{r simulationFunction, include=FALSE}
+```{r simulationFunction, echo=FALSE, message=FALSE}
 simulate_HT <- function(sims, stands, nStands,
                         acresPerPlot, cores) {
   message(
@@ -584,7 +589,7 @@ simulate_HT <- function(sims, stands, nStands,
 ```
 
 We are simulating 100 samples for six sample intensities: 10, 20, and 30 stands out of the 100 in the population. Stands will be selected using the same probabilities as the example we walked through earlier.
-```{r simulate}
+```{r simulate, echo=FALSE}
 stands$prop <- stands$acres * stands$age / sum(stands$acres * stands$age)
 
 simFrame <- bind_rows(
@@ -618,7 +623,7 @@ simStats <- simFrame %>%
 ```
 
 The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates and the precision of estimates increases substantially as we sample more stands.
-```{r simulationPlot1, include=FALSE}
+```{r simulationPlot1, echo=FALSE}
 simFrame %>%
   mutate(
     ci90MeanCuft = ifelse(
@@ -661,7 +666,7 @@ simFrame %>%
 ```
 
 The estimates appear to be very stable around the true mean, but the confidence intervals seem to overestimate the sample variance. We should expect ~10% of samples to yield a confidence interval that does not contain the true mean. This simulation suggests that there is a problem in the variance calculation.
-```{r simulationTable, include=FALSE}
+```{r simulationTable, echo=FALSE}
 outTableUnequal <- simStats %>%
   bind_rows(truth %>% select(source, meanCuft)) %>%
   rename(
@@ -683,7 +688,7 @@ The results indicate that the half-width of the 90% confidence interval is about
 ## Compare to simple random sample
 To run the same simulation using a simple random sample we just need to make the sample weights equal for all stands. We can use the same Horvitz-Thompson estimators since the only things we have changed are the inclusion probabilities.
 
-```{r srs,}
+```{r srs, echo=FALSE}
 stands$prop <- 1 / nrow(stands)
 
 simFrameSRS <- bind_rows(
@@ -698,7 +703,7 @@ simFrameSRS <- bind_rows(
 )
 ```
 
-```{r simStatsSRS, include=FALSE}
+```{r simStatsSRS, echo=FALSE}
 simStatsSRS <- simFrameSRS %>%
   mutate(
     meanInCI = ifelse(
@@ -773,7 +778,7 @@ pander::pander(
 
 The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. Now we can compare the two, and it looks like the unequal probability sample yields much more stable estimates, with higher precision. That is why we can save lots of time and energy by spending
 
-```{r simComp, include=FALSE}
+```{r simComp, echo=FALSE}
 simComparison <- bind_rows(
   simFrame %>% mutate(source = "unequal probability"),
   simFrameSRS %>% mutate(source = "equal probability")
