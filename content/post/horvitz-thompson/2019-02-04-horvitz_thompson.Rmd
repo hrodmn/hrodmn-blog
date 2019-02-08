@@ -771,9 +771,11 @@ outTableSRS <- simStatsSRS %>%
     "90% CI" = ci90MeanCuft,
     "proportion of CIs containing true mean" = propMatchCI
   )
+
 pander::pander(
   outTableSRS,
   missing = "-",
+  digits = 2,
   emphasize.strong.rows = which(outTableUnequal$source == "truth"),
   caption = "summary of equal probability sampling simulation"
 )
