@@ -665,7 +665,8 @@ simFrame %>%
   )
 ```
 
-The estimates appear to be very stable around the true mean, but the confidence intervals seem to overestimate the sample variance. We should expect ~10% of samples to yield a confidence interval that does not contain the true mean. This simulation suggests that there is a problem in the variance calculation.
+We expect ~90% of samples to yield a confidence interval that contains the true mean, this simulation gives the expected result. The results indicate that the half-width of the 90% confidence interval is about 10% of the mean when we sample 20 stands out of 100.
+
 ```{r simulationTable, echo=FALSE}
 outTableUnequal <- simStats %>%
   bind_rows(truth %>% select(source, meanCuft)) %>%
@@ -678,14 +679,16 @@ outTableUnequal <- simStats %>%
 pander::pander(
   outTableUnequal,
   missing = "-",
+  digits = 2,
   emphasize.strong.rows = which(outTableUnequal$source == "truth"),
   caption = "summary of unequal probability sampling simulation"
 )
 
 ```
-The results indicate that the half-width of the 90% confidence interval is about 10% of the mean when we sample 20 stands out of 100. Next, we are going to see how much more efficient the unequal probability sample is than a simple random sample for the first stage of sampling.
 
-## simple random sample
+Next, we are going to see how much more efficient the unequal probability sample is than a simple random sample for the first stage of sampling.
+
+## Simple random sample
 To run the same simulation using a simple random sample we just need to make the sample weights equal for all stands. We can use the same Horvitz-Thompson estimators since the only things we have changed are the inclusion probabilities.
 
 ```{r srs, echo=FALSE}
