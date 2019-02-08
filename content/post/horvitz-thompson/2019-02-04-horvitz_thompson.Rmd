@@ -1,5 +1,5 @@
 ---
-title: "Forest Inventory: Application of Horvitz-Thompson estimators in a two stage sample"
+title: "Forest Inventory: Application of Horvitz-Thompson estimators in a two-stage sample"
 author: "Henry Rodman"
 date: "2019-02-04"
 categories: ["R"]
@@ -20,11 +20,14 @@ pander::panderOptions(
 
 library(tidyverse)
 theme_set(theme_bw())
+
 ```
 
-Though you may not notice it, forest management is a part of your life. The air we breath, water we drink, and our homes are all in some way composed of forest resources. To secure an adequate and sustainable supply of these resources, we manage forests. Humans have been managing forests with varying degrees of success throughout our entire history and the science of forestry has been developed to help us manage forests better than those who came before us. The application of statistical survey sampling techniques to the assessment of forest resources (aka forest inventory) has been elemental to improvements in forest management practices across the globe.
+The application of statistical survey sampling techniques to the assessment of forest resources (aka forest inventory) has been elemental to improvements in forest management practices across the globe. Sampling methods that can efficiently yield accurate and precise estimates are preferred by forest managers because collecting forest inventory data is difficult and expensive! This post is meant to outline the application of two-stage sampling to forest inventory.
 
-In any context, bad management decisions are often a product of bad information or poorly calibrated expectations for the future. The same is true in forestry and is the reason why forest inventory is so important. Efficient and unbiased sampling techniques have long been a focus in statistics, and forest managers use these methods every day to obtain the information required to make intelligent management decisions. This post is meant to outline the application of two-stage sampling to forest inventory.
+In any context, bad management decisions are often a product of bad information or poorly calibrated expectations for the future. The same is true in forestry and is the reason why forest inventory is so important. Efficient and unbiased sampling techniques have long been a focus in statistics, and forest managers use these methods every day to obtain the information required to make intelligent management decisions. Two-stage sampling is one way to improve resource efficiency by limiting the number of stands (primary sample units) that are visited and by using auxilliary information for selecting sampled stands.
+
+I dug around the internet, textbooks, and through my old lecture notes from forest mensuration courses and could not find a complete demonstration of a two-stage sample where the primary sample units were selected with unequal probability. The Horvitz-Thompson estimators provide most of the solution, but they need to be extended slightly to account for the variance within primary sampling units (sample variance within individual stands). I have combined equations for estimators from several texts, and used simulation to approximate the inclusion probabilities.
 
 ## Objectives
 Let's say that I am a forest manager that needs an estimate of the volume of standing trees in a tract of forest land. I want to obtain an accurate estimate for the lowest price possible. I am willing to pay more for a more precise estimate, but do not need an estimate that is more precise than +/- 10% at 90% confidence. In statistical terms, I would like the half-width of the 90% confidence interval to be roughly 10% of the estimate of the total volume.
@@ -38,7 +41,7 @@ The forest is composed of 100 stands of forest that vary in size, most of the st
 stands <- tibble(id = 1:100) %>%
   mutate(
     acres = runif(
-      n = 100, min = 1, max = 400
+      n = 100, min = 10, max = 200
     ),
     age = runif(
       n = 100, min = 10, max = 150
@@ -48,7 +51,7 @@ stands <- tibble(id = 1:100) %>%
   mutate(
     cuftPerAc = 3000 *
       1 / (1 + exp(-(age - 40) / 15)) +
-      rnorm(n = 100, mean = 0, sd = 200),
+      rnorm(n = 100, mean = 0, sd = 300),
     cuftPerAc = ifelse(cuftPerAc < 0, 0, cuftPerAc),
     cuftTot = cuftPerAc * acres
   )
@@ -76,7 +79,7 @@ The true population mean stocking is `r round(meanCuft)` cubic feet per acre, th
 ## Designing a sample
 There are many ways to obtain an estimate of the total volume for the forest. The most expensive way would be to visit every tree in the forest, measuring several dimensions and estimating volume for every single tree. This would provide us with an accurate and precise estimate but would be time consuming and prohibitively expensive. We could also just guess the total based on what we know about the property. This would be very cheap today, but our estimate is likely to be inaccurate and will probably result in significant costs related to bad information down the road. Our best bet is to take a sample from the population. A simple random sample of 1/15 acre circular plots distributed across the property would be a fine way to sample the property, but we also want information about individual stands for planning purposes so we should do something else.
 
-A double sample is an appealing option because we can obtain an accurate estimate of the population total while obtaining stand-level estimates that we will use for modeling forest growth and evaluating forest management options. We can also be more efficient in our sampling efforts by controlling the total number of stands that we must visit.
+A double sample is an appealing option because we can obtain an accurate estimate of the population total while obtaining stand-level estimates that we will use for modeling forest growth and evaluating forest management options. We can also improve the precision of our estimates by sampling stands with weights that we expect to be correlated with our variable of interest (total volume).
 
 ### Selecting stands
 The population of stands could be sampled randomly, but since we are trying to obtain an estimate of total volume for the property, we need to make sure that we sample the stands that a) contribute the most to the total volume, and b) contribute the most variance to the population. Using the Horvitz-Thompson estimators, we can sample the stands however we want so long as we know the probability of each stand being included in the sample! This is a case of _unequal probability sampling_ and the Horvitz-Thompson estimators will be statistically efficient if the probability of inclusion for each primary sampling unit is correlated with the variable of interest. In this case, we are going to weight our sample on age x acres since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume.
@@ -93,33 +96,110 @@ The distinction between $p_{i}$ and $\pi_{i}$ is very important. Think of $\pi_{
 
 For this sample we are going to weight our sample on `age * acres` since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume. We have decided that we are going to sample 20 stands and install either one plot per 8 acres or 30 plots per stand, whichever is fewer.
 
-```{r sampleSimulation}
+```{r sampleWeightsPlot}
+stands$prop <- (stands$age * stands$acres) /
+  sum(stands$age * stands$acres)
 
-stands$prop <- (stands$cuftPerAc * stands$acres) /
-  sum(stands$cuftPerAc * stands$acres)
+stands %>%
+  ggplot(aes(x = age * acres, y = cuftTot)) +
+  geom_point() +
+  ylab(bquote("total volume (" ~ ft^{3} ~ ")"))
+  
+```
 
-simulate_sample <- function(sims, stands, nSamp) {
-  bind_rows(
-    lapply(1:sims,
+We need to estimate the inclusion probabilities ($\pi_{i}$) for all stands as well as the joint inclusion probabilities ($\pi_{ij}$) for all pairs of stands. Most texts will describe $\pi_{ij}$ as a difficult variable to calculate, but we can obtain estimates using brute force simulation.
+
+```{r inclusionProbablities}
+simulate_sample <- function(sims, stands, nSamp, cores) {
+  simFrame <- bind_rows(
+    parallel::mclapply(1:sims,
       function(i, ...) {
         stands %>%
-          sample_n(nSamp, weight = prop) %>%
-          mutate(try = i)
-      }
-    )) %>%
+          sample_n(nSamp, weight = prop)
+      },
+      mc.cores = cores
+    ),
+    .id = "sim"
+  )
+  out <- list(
+    simFrame = simFrame,
+    sims = sims,
+    nSamp = nSamp,
+    ids = stands$id
+  )
+  return(out)
+}
+
+estimate_pi_i <- function(simList) {
+  simList[["simFrame"]] %>%
     group_by(id) %>%
-    summarize(pi_i_sim = n() / sims) %>%
+    summarize(pi_i_sim = n() / simList[["sims"]]) %>%
     left_join(stands, by = "id") %>%
     mutate(
-      pi_i_approx = nSamp * prop
+      pi_i_approx = simList[["nSamp"]] * prop
     ) %>%
     select(id, pi_i_sim, pi_i_approx, prop)
 }
 
-sampleSim20 <- simulate_sample(
+estimate_joint_probs <- function(simList, cores) {
+  ids <- unique(simList[["simFrame"]]$id)
+  idxs <- 1:length(ids)
+  # unique pairs of elements
+  pairs <- combn(ids, m = 2, simplify = FALSE)
+  
+  estimate_joint_prob <- function(pair, simFrame, sims, cores) {
+    simFrame %>%
+      filter(id %in% pair) %>%
+      group_by(sim) %>%
+      mutate(n = n()) %>%
+      filter(n > 1) %>%
+      ungroup() %>%
+      select(sim) %>%
+      distinct() %>%
+      tally %>%
+      rowwise() %>%
+      mutate(
+        id1 = pair[1], id2 = pair[2],
+        row = idxs[which(ids == id1)],
+        col = idxs[which(ids == id2)],
+        jointProb = n / sims
+      ) %>%
+      select(-n)
+  }
+  
+  f <- bind_rows(
+    parallel::mclapply(
+      pairs,
+      estimate_joint_prob,
+      simFrame = simList[["simFrame"]],
+      sims = simList[["sims"]],
+      mc.cores = cores
+    )
+  )
+
+  frame <- matrix(NA, nrow = length(ids), ncol = length(ids))
+  frame[as.matrix(f[3:4])] <- f$jointProb
+  frame[as.matrix(f[4:3])] <- f$jointProb
+
+  output <- data.frame(frame)
+  row.names(output) <- ids
+  names(output) <- ids
+
+  return(output)
+}
+
+simList20 <- simulate_sample(
   sims = 10000,
   stands = stands,
-  nSamp = 20
+  nSamp = 20,
+  cores = 2
+)
+
+sampleSim20 <- estimate_pi_i(simList = simList20)
+
+jointProbs <- estimate_joint_probs(
+  simList = simList20,
+  cores = 2
 )
 
 sampleSim20 %>%
@@ -133,7 +213,8 @@ sampleSim20 %>%
 ```
 As you can see, there are subtle differences between the approximate $\pi_{i}$ values and the $\pi_{i}$ values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.
 
-By plotting $\pi_{i}$ in volume and stand acreage space we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.
+By plotting $\pi_{i}$ with the true total volume we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.
+
 ```{r samplingProbabilityField}
 sampleSim20 %>%
   left_join(stands) %>%
@@ -148,13 +229,25 @@ sampleSim20 %>%
   scale_color_continuous(
     name = bquote("simulated" ~ pi[i])
   )
+  
+sampleSim20 %>%
+  left_join(stands) %>%
+  ggplot(
+    aes(
+      x = pi_i_sim,
+      y = cuftPerAc * acres
+    )
+  ) +
+  geom_point() +
+  ylab(bquote("total volume (" ~ ft^{3} ~ ")")) +
+  xlab(bquote("simulated" ~ pi[i]))
 
 ```
 
 Now we are going to step through a sample of the population.
 
 ```{r sampleStands}
-acresPerPlot <- 8
+acresPerPlot <- 6
 
 sampStands <- stands %>%
   sample_n(size = 20, weight = prop) %>%
@@ -167,10 +260,11 @@ sampStands <- stands %>%
   ) %>%
   left_join(
     sampleSim20 %>%
-      select(id, pi_i = pi_i_sim),
+      select(id, pi_i_sim),
     by = "id"
-  )
-  
+  ) %>%
+  ungroup()
+
 stands %>%
   mutate(
     sampled = case_when(
@@ -181,18 +275,19 @@ stands %>%
   ggplot(
     aes(x = acres, y = cuftPerAc, color = sampled)
   ) +
-  geom_point()
-  
+  geom_point() +
+  ylab(bquote("volume (" ~ ft^{3} ~ "/ac)"))
+
 ```
 
 ### Measure plots
-In each sample stand we are installing a systematic random sample of 1/15 acre circular plots. On each plot we are estimating the cubic foot volume of the living trees. This is the second stage of our two-stage sample. We are simulating plots using a truncated normal distribution based on the true mean and coefficient of variation of each stand. We are using a truncated normal distribution with a lower limit of 0 since it is not possible to observe negative volume!
+In each sample stand we are installing a systematic random sample of 1/15 acre circular plots. On each plot we are estimating the cubic foot volume of the living trees. This is the second stage of our two-stage sample. We are simulating plots using a normal distribution based on the true mean and coefficient of variation of each stand.
 ```{r samplePlots}
 plotTab <- sampStands %>%
   rowwise() %>%
   mutate(
     cuftObs = list(
-      rnorm(# biological maximum
+      rnorm(
         n = nPlots,
         mean = cuftPerAc,
         sd = (cv / 100) * cuftPerAc
@@ -208,28 +303,6 @@ plotTab <- sampStands %>%
 ## Analysis
 Once we are done cruising it's time to crunch the numbers!
 
-### Stand-level estimates
-We can start by summarizing the stand-level estimates. For each stand we will estimate the total volume using the mean volume per acre from the sample and the total acres of each stand. We will also compute the sample variance and estimate the total variance for each stand.
-```{r standStats}
-standDat <- plotTab %>%
-  left_join(
-    sampStands %>% select(id, acres, cuftPerAc),
-    by = "id"
-  ) %>%
-  group_by(id, acres) %>%
-  summarize(
-    meanObs = mean(cuftObs),
-    tHat = mean(cuftObs * acres),
-    varTHat = var(cuftObs * acres) / n(),
-    sdObs = sd(cuftObs),
-    nPlots = n()
-  )
-
-```
-
-### Population-level estimate
-We can now combine the estimates from the primary sampling units to obtain an estimate of the population. To do this we will use the inclusion and selection probabilities to weight each sampled stand's contribution to the population total.
-
 #### Equations
 The Horvitz-Thompson estimator for the population total is:
 $$
@@ -237,81 +310,112 @@ $$
 $$
 where $S$ is the sample of primary sample units from population sized $N$
 
-The estimator for variance of the population total is:
+The Sen-Yates-Grundy estimator for variance of the population total is:
 
 $$
-\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} (1 - \pi_{i}) \displaystyle \frac{\hat{t_{i}}^{2}}{\pi_{i}^{2}}+
-\sum_{i \in S} \sum_{\substack{k \in S \\ k \neq i}} \displaystyle \frac{\pi_{ik} - \pi_{i}\pi_{k}}{\pi_{ik}}
-\displaystyle \frac{\hat{t}_{i}}{\pi_{i}} \frac{\hat{t}_{k}}{\pi_{k}} +
+\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k \neq i}}
+\displaystyle \frac{\pi_{ik} - \pi_{i}\pi_{k}}{\pi_{ik}} \left(\frac{\hat{t}_{i}}{\pi_{i}} - \frac{\hat{t}_{k}}{\pi_{k}}\right)^{2}+
 \sum_{i \in S} \displaystyle \frac{\hat{V}(\hat{t_{i}})}{\pi_{i}}
 $$
 
-where $\pi_{ik}$ is the joint inclusion probability for primary sampling units $i$ and $k$.
+where $\pi_{ik}$ is the joint inclusion probability for primary sampling units $i$ and $k$ and $\hat{V}(\hat{t_{i}})$ is the variance of the estimate for the $i$th sample unit.
 
-$\pi_{ik}$ is approximated using this equation:
-
-$$
-\pi_{ik} = \pi_{i} + \pi_{k} - (1 - (1 - p_{i} - p_{k})^n)
-$$
-
-We will extend the estimate of population variance ($\hat{V}(\hat{t}_{HT})$) to obtain a standard error and 90% confidence interval for the population.
-
-There is one component of the variance calculation where each observation must be compared to the rest of the observations in the sample. There may be a more elegant way to code that part, but for now this is what I have come up with:
+The Sen-Yates-Grundy formulation of the variance calculation requires each observation to be compared to the rest of the observations in the sample. There may be a more elegant way to code that part, but for now this is what I have come up with:
 ```{r varianceCalcFunction}
-sub_var <- function(row, data, y, pi_i, p) {
+# Sen-Yates-Grundy formulation
+var_syg <- function(row, data, y, pi_i, p,
+                    jointProbs = NULL) {
+  data$idx <- 1:nrow(data)
   a <- data[row, ]
-  b <- data[-row, ]
+  b <- data[data$idx > row, ]
   n <- nrow(data)
-
+  if(row == max(data$idx)) {
+    return(0)
+  }
+  message(
+    paste0(
+      "row ", row
+    )
+  )
   x <- list()
   for (l in 1:nrow(b)) {
     c <- b[l, ]
+    r <- as.character(a[["id"]])
+    col <- as.character(c[["id"]])
+    jp <- jointProbs[row.names(jointProbs) == r, col]
 
-    jp <- a[[pi_i]] + c[[pi_i]] -
-      (1 - (1 - a[[p]] - c[[p]])^n)
-
-    x[[l]] <- ((jp - a[[pi_i]] * c[[pi_i]]) /
-      a[[pi_i]] * c[[pi_i]]) *
-      a[[y]] * c[[y]] / jp
+    x[[l]] <- ((a[[pi_i]] * c[[pi_i]] - jp) / jp) *
+      (a[[y]] / a[[pi_i]] - c[[y]] / c[[pi_i]])^2
   }
 
   sum(unlist(x))
 }
+
 ```
 
-Using the equations listed above we will compute estimates of the population total and variance of the total, then convert those into estimates of cubic foot volume on a per-acre basis.
+### Stand-level estimates
+We can start by summarizing the stand-level estimates. For each stand we will estimate the total volume using the mean volume per acre from the sample and the total acres of each stand. We will also compute the sample variance and estimate the total variance for each stand.
+```{r standStats}
+standDat <- plotTab %>%
+  left_join(
+    sampStands %>% select(id, acres, cuftPerAc, nPlots, pi_i = pi_i_sim),
+    by = "id"
+  ) %>%
+  group_by(id) %>%
+  summarize(
+    tHat = mean(cuftObs * acres),
+    varTHat = var(cuftObs * acres) / n(),
+    nPlots = n()
+  )
+
+standDat %>%
+  left_join(stands) %>%
+  mutate(se = sqrt(varTHat)) %>%
+  ggplot(aes(x = cuftTot, y = tHat)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = tHat - 1.7 * se, ymax = tHat + 1.7 * se)) +
+  geom_abline()
+
+```
+
+### Population-level estimate
+We can now combine the estimates from the primary sampling units to obtain an estimate of the population. To do this we will use the inclusion and selection probabilities to weight each sampled stand's contribution to the population total.
+
+Using the equations listed above we will compute estimates of the population total and sampling variance of that estimate, then convert those into estimates of cubic foot volume on a per-acre basis.
 ```{r populationStats}
 sampleSummary <- standDat %>%
   left_join(
     sampStands %>%
-      select(id, pi_i, prop),
+      select(id, pi_i = pi_i_sim, prop),
     by = "id"
   ) %>%
   ungroup() %>%
   mutate(
-    subVar = unlist(
-      lapply(
+    var_I_syg = unlist(
+      parallel::mclapply(
         1:nrow(.),
-        sub_var,
+        var_syg,
         data = .,
         y = "tHat",
         pi_i = "pi_i",
-        p = "prop"
+        p = "prop",
+        jointProbs = jointProbs,
+        mc.cores = 12
       )
     )
   ) %>%
   ungroup() %>%
   summarize(
     totalCuft = sum(tHat / pi_i),
-    fpc = 1 - n() / nrow(stands),
-    varTot = fpc * (
-      sum(((1 - pi_i) / pi_i^2) * tHat^2) +
-        sum(subVar) + sum(varTHat / pi_i)
-      ),
+    fpcI = 1,
+    fpcII = 1,
+    varI = sum(var_I_syg),
+    varII = sum(varTHat / pi_i),
+    varTot = fpcI * varI + fpcII * varII,
     nObs = n()
   ) %>%
   mutate(
-    seTot = sqrt(varTot / nObs),
+    seTot = sqrt(varTot),
     ci90Tot = qt(
       1 - 0.1 / 2,
       df = nObs - 1
@@ -342,26 +446,41 @@ results %>%
       ymin = meanCuft - ci90MeanCuft
     )
   ) +
-  ylim(0, max(standDat$meanObs) * 1.5) +
+  ylim(0, max((results$meanCuft + results$ci90MeanCuft)) * 1.5) +
   ylab(bquote("volume (" ~ ft^{3} ~ "/ac)"))
+
 ```
 
 ## Simulate many samples
-Though we may be stuck with it in real life, the result of a single sample is not very helpful for evaluating the performance of a sample design. To do that we will simulate many samples and evaluate the performance of various sampling intensities by assessing trends in precison and bias.
+Though we may be stuck with it in real life, the result of a single sample is not very helpful for evaluating the performance of a sample design. To do that we will simulate many samples and evaluate the performance of various sampling intensities by assessing trends in precision and bias.
 ```{r simulationFunction, include=FALSE}
 simulate_HT <- function(sims, stands, nStands,
-                        acresPerPlot) {
+                        acresPerPlot, cores) {
+  message(
+    paste0(
+      "nStands: ", nStands,
+      " acresPerPlot: ", acresPerPlot
+    )
+  )
   
-  sampleSim <- simulate_sample(
+  message("simulating samples")
+  simList <- simulate_sample(
     sims = 10000,
     stands = stands,
-    nSamp = nStands
+    nSamp = nStands,
+    cores = cores
   )
+  message("simulating pi_i")
+  sampleSim <- estimate_pi_i(simList = simList)
+  
+  message("simulating jointProbs")
+  jointProbs <- estimate_joint_probs(simList, cores = cores)
   
   out <- bind_rows(
     lapply(
       1:sims,
-      function(...) {
+      function(i, ...) {
+        message(paste0("sim ", i))
         sampStands <- stands %>%
           sample_n(
             size = nStands,
@@ -387,9 +506,7 @@ simulate_HT <- function(sims, stands, nStands,
           group_by(id) %>%
           mutate(
             cuftObs = list(
-              truncnorm::rtruncnorm(
-                a = -Inf, # biological minimum
-                b = Inf,
+              rnorm(
                 n = nPlots,
                 mean = cuftPerAc,
                 sd = (cv / 100) * cuftPerAc
@@ -402,16 +519,13 @@ simulate_HT <- function(sims, stands, nStands,
 
         standDat <- plotTab %>%
           left_join(
-            sampStands %>%
-              select(id, acres),
+            sampStands %>% select(id, acres, cuftPerAc, nPlots, pi_i),
             by = "id"
           ) %>%
-          group_by(id, acres) %>%
+          group_by(id) %>%
           summarize(
-            meanObs = mean(cuftObs),
             tHat = mean(cuftObs * acres),
-            varTHat = mean(acres)^2 * var(cuftObs) / n(),
-            sdObs = sd(cuftObs),
+            varTHat = var(cuftObs * acres) / n(),
             nPlots = n()
           )
 
@@ -423,33 +537,33 @@ simulate_HT <- function(sims, stands, nStands,
           ) %>%
           ungroup() %>%
           mutate(
-            subVar = unlist(
-              lapply(
+            var_I_syg = unlist(
+              parallel::mclapply(
                 1:nrow(.),
-                sub_var,
+                var_syg,
                 data = .,
                 y = "tHat",
                 pi_i = "pi_i",
-                p = "prop"
+                p = "prop",
+                jointProbs = jointProbs,
+                mc.cores = cores
               )
             )
           ) %>%
           ungroup() %>%
           summarize(
             totalCuft = sum(tHat / pi_i),
-            fpc = 1 - n() / nrow(stands),
-            varTot = fpc * (
-              sum(((1 - pi_i) / pi_i^2) * tHat^2) +
-                sum(subVar) + sum(varTHat / pi_i)
-              ),
+            # fpcI = 1 - n() / nrow(stands),
+            fpcI = 1,
+            fpcII = 1,
+            varI = sum(var_I_syg),
+            varII = sum(varTHat / pi_i),
+            varTot = fpcI * varI + fpcII * varII,
             nObs = n()
           ) %>%
           mutate(
-            seTot = sqrt(varTot / nObs),
-            ci90Tot = qt(
-              1 - 0.1 / 2,
-              df = nObs - 1
-              ) * seTot,
+            seTot = sqrt(varTot),
+            ci90Tot = qt(1 - 0.1 / 2,df = nObs - 1) * seTot,
             meanCuft = totalCuft / totalAcres,
             seMeanCuft = seTot / totalAcres,
             ci90MeanCuft = ci90Tot / totalAcres,
@@ -464,22 +578,26 @@ simulate_HT <- function(sims, stands, nStands,
       }
     )
   )
-  
+  message("complete")
   out
 }
 ```
 
-We are simulating 100 samples for six sample intensities: 10, 20, 30, 40, 50, and 60 stands out of the 100 in the population. Stands will be selected using the same probabilities as the example we walked through earlier.
+We are simulating 100 samples for six sample intensities: 10, 20, and 30 stands out of the 100 in the population. Stands will be selected using the same probabilities as the example we walked through earlier.
 ```{r simulate}
+stands$prop <- stands$acres * stands$age / sum(stands$acres * stands$age)
+
 simFrame <- bind_rows(
   map(
-    .x = c(10, 20, 30, 40, 50, 60),
+    .x = c(10, 20, 30),
     .f = simulate_HT,
     stands = stands,
     sims = 100,
-    acresPerPlot = acresPerPlot
+    acresPerPlot = acresPerPlot,
+    cores = 2
   )
 )
+
 
 simStats <- simFrame %>%
   mutate(
@@ -490,6 +608,7 @@ simStats <- simFrame %>%
       FALSE
     )
   ) %>%
+  filter(ci90MeanCuft != Inf) %>%
   group_by(source, nObs) %>%
   summarize(
     meanCuft = mean(meanCuft),
@@ -498,27 +617,16 @@ simStats <- simFrame %>%
   )
 ```
 
-The histograms of sample mean for each level of sampling intensity shows that the sample means become more stable as we increase sample size.
-```{r simulationPlot1}
-ggplot(data = simFrame, aes(x = meanCuft)) +
-  geom_histogram() +
-  theme_bw() +
-  facet_wrap(~nObs) +
-  xlim(0, max(simFrame$meanCuft)) +
-  geom_vline(
-    xintercept = truth$meanCuft,
-    color = "blue"
-  ) +
-  geom_vline(
-    data = simStats,
-    aes(xintercept = meanCuft),
-    color = "red"
-  )
-```
-
-The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates, but the precision of estimates increases substantially as we sample more stands.
-```{r simulationPlot2}
+The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates and the precision of estimates increases substantially as we sample more stands.
+```{r simulationPlot1, include=FALSE}
 simFrame %>%
+  mutate(
+    ci90MeanCuft = ifelse(
+      ci90MeanCuft == Inf,
+      NA,
+      ci90MeanCuft
+    )
+  ) %>%
   group_by(nObs) %>%
   mutate(sim = row_number()) %>%
   ggplot(aes(x = meanCuft, y = sim)) +
@@ -538,14 +646,23 @@ simFrame %>%
   facet_wrap(~ nObs) +
   xlim(
     0,
-    max(simFrame$meanCuft) +
-      max(simFrame$ci90MeanCuft)
+    max(simFrame$meanCuft[simFrame$ci90MeanCuft != Inf]) +
+      max(simFrame$ci90MeanCuft[simFrame$ci90MeanCuft != Inf])
+  ) +
+  labs(
+    title = "sampling probability proportional to age x acres"
+  ) +
+  xlab(bquote("volume (" ~ ft^{3} ~ "/ac)")) +
+  theme(
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks.y = element_blank()
   )
 ```
 
-Based on the criteria we set for acceptable precision (+/- 10% of mean at 90% confidence), we should be able to get by with a sample of 20 stands!
-```{r simulationTable}
-outTable <- simStats %>%
+The estimates appear to be very stable around the true mean, but the confidence intervals seem to overestimate the sample variance. We should expect ~10% of samples to yield a confidence interval that does not contain the true mean. This simulation suggests that there is a problem in the variance calculation.
+```{r simulationTable, include=FALSE}
+outTableUnequal <- simStats %>%
   bind_rows(truth %>% select(source, meanCuft)) %>%
   rename(
     "# sampled stands" = nObs,
@@ -554,8 +671,153 @@ outTable <- simStats %>%
     "proportion of CIs containing true mean" = propMatchCI
   )
 pander::pander(
-  outTable,
+  outTableUnequal,
   missing = "-",
-  emphasize.strong.rows = which(outTable$source == "truth")
+  emphasize.strong.rows = which(outTable$source == "truth"),
+  caption = "summary of unequal probability sampling simulation"
 )
+
+```
+The results indicate that the half-width of the 90% confidence interval is about 10% of the mean when we sample 20 stands out of 100. Next, we are going to see how much more efficient the unequal probability sample is than a simple random sample for the first stage of sampling.
+
+## Compare to simple random sample
+To run the same simulation using a simple random sample we just need to make the sample weights equal for all stands. We can use the same Horvitz-Thompson estimators since the only things we have changed are the inclusion probabilities.
+
+```{r srs,}
+stands$prop <- 1 / nrow(stands)
+
+simFrameSRS <- bind_rows(
+  map(
+    .x = c(10, 20, 30),
+    .f = simulate_HT,
+    stands = stands,
+    sims = 100,
+    acresPerPlot = acresPerPlot,
+    cores = 2
+  )
+)
+```
+
+```{r simStatsSRS, include=FALSE}
+simStatsSRS <- simFrameSRS %>%
+  mutate(
+    meanInCI = ifelse(
+      truth$meanCuft <= meanCuft + ci90MeanCuft &
+        truth$meanCuft >= meanCuft - ci90MeanCuft,
+      TRUE,
+      FALSE
+    )
+  ) %>%
+  group_by(source, nObs) %>%
+  summarize(
+    meanCuft = mean(meanCuft),
+    ci90MeanCuft = mean(ci90MeanCuft),
+    propMatchCI = mean(meanInCI)
+  )
+
+simFrameSRS %>%
+  mutate(
+    ci90MeanCuft = ifelse(
+      ci90MeanCuft == Inf,
+      NA,
+      ci90MeanCuft
+    )
+  ) %>%
+  group_by(nObs) %>%
+  mutate(sim = row_number()) %>%
+  ggplot(aes(x = meanCuft, y = sim)) +
+  geom_errorbarh(
+    aes(
+      xmin = meanCuft - ci90MeanCuft,
+      xmax = meanCuft + ci90MeanCuft
+    ),
+    alpha = 0.8,
+    color = "orange"
+  ) +
+  geom_point(size = 1, alpha = 0.8) +
+  geom_vline(
+    aes(xintercept = truth$meanCuft),
+    color = "green"
+  ) +
+  facet_wrap(~ nObs) +
+  xlim(
+    0,
+    max(simFrameSRS$meanCuft) +
+      max(simFrameSRS$ci90MeanCuft)
+  ) +
+  labs(
+    title = "simple random sample"
+  ) +
+  xlab(bquote("volume (" ~ ft^{3} ~ "/ac)")) +
+  theme(
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+outTableSRS <- simStatsSRS %>%
+  bind_rows(truth %>% select(source, meanCuft)) %>%
+  rename(
+    "# sampled stands" = nObs,
+    "average sample cu. ft. per/ac" = meanCuft,
+    "90% CI" = ci90MeanCuft,
+    "proportion of CIs containing true mean" = propMatchCI
+  )
+pander::pander(
+  outTableSRS,
+  missing = "-",
+  emphasize.strong.rows = which(outTable$source == "truth"),
+  caption = "summary of equal probability sampling simulation"
+)
+```
+
+The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. Now we can compare the two, and it looks like the unequal probability sample yields much more stable estimates, with higher precision. That is why we can save lots of time and energy by spending
+
+```{r simComp, include=FALSE}
+simComparison <- bind_rows(
+  simFrame %>% mutate(source = "unequal probability"),
+  simFrameSRS %>% mutate(source = "equal probability")
+)
+
+simComparison %>%
+  mutate(
+    ci90MeanCuft = ifelse(
+      ci90MeanCuft == Inf,
+      NA,
+      ci90MeanCuft
+    )
+  ) %>%
+  group_by(source, nObs) %>%
+  mutate(sim = row_number()) %>%
+  ggplot(aes(x = meanCuft, y = sim)) +
+  geom_errorbarh(
+    aes(
+      xmin = meanCuft - ci90MeanCuft,
+      xmax = meanCuft + ci90MeanCuft,
+    ),
+    alpha = 0.8,
+    color = "orange"
+  ) +
+  geom_point(size = 1, alpha = 0.8) +
+  geom_vline(
+    aes(xintercept = truth$meanCuft),
+    color = "green"
+  ) +
+  facet_grid(source ~ nObs) +
+  xlim(
+    0,
+    max(simFrameSRS$meanCuft) +
+      max(simFrameSRS$ci90MeanCuft)
+  ) +
+  xlab(bquote("volume (" ~ ft^{3} ~ "/ac)")) +
+  labs(
+    title = "unequal vs equal probability samples"
+  ) +
+  theme(
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+
 ```
