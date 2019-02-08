@@ -465,6 +465,7 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
 <div id="simple-random-sample" class="section level2">
 <h2>Simple random sample</h2>
 <p>To run the same simulation using a simple random sample we just need to make the sample weights equal for all stands. We can use the same Horvitz-Thompson estimators since the only things we have changed are the inclusion probabilities.</p>
+<p>The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.</p>
 </div>
 <div id="section" class="section level2">
 <h2><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simStatsSRS-1.png" width="672" /></h2>
@@ -478,7 +479,6 @@ mean<br />
 <div id="truth---2336----" class="section level2">
 <h2><strong>truth</strong> <strong>-</strong> <strong>2336</strong> <strong>-</strong> <strong>-</strong></h2>
 <p>Table: summary of equal probability sampling simulation</p>
-<p>The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.</p>
 <p>We can see that the unequal probability sample yields much more stable estimates with higher precision. This demonstrates how we can save lots of time and energy with a bit of extra work during the sample design phase of a resource assessment project.</p>
 <p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simComp-1.png" width="672" /></p>
 </div>

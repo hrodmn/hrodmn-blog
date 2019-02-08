@@ -700,6 +700,8 @@ simFrameSRS <- bind_rows(
 )
 ```
 
+The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.
+
 ```{r simStatsSRS, echo=FALSE}
 simStatsSRS <- simFrameSRS %>%
   mutate(
@@ -775,8 +777,6 @@ pander::pander(
 )
 
 ```
-
-The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.
 
 We can see that the unequal probability sample yields much more stable estimates with higher precision. This demonstrates how we can save lots of time and energy with a bit of extra work during the sample design phase of a resource assessment project.
 
