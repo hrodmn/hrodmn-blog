@@ -322,7 +322,7 @@ $$
 \hat{V}(\hat{t_{i}}) = \displaystyle \frac{\sum_{j=1}^{n_{j}}(\hat{t}_{ij} - \hat{t}_{i})^2}{n_{i}(n_{i} - 1)}
 $$
 
-where $n_{i}$ is the number of sample observations in primary sample unit $i$
+where $n_{i}$ is the number of sample observations in primary sample unit $i$ and $\hat{t}_{i}$ is the estimate of the total for the $i$th sample unit.
 
 $\hat{t}_{ij}$ is the $j$th estimate of the total on the $i$th primary sample unit. In this case, we observed the cubic feet per acre on each plot then multiplied by stand acres to get total cubic feet.
 

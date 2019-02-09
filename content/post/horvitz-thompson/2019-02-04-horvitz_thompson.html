@@ -281,7 +281,7 @@ stands %&gt;%
 <p><span class="math display">\[
 \hat{V}(\hat{t_{i}}) = \displaystyle \frac{\sum_{j=1}^{n_{j}}(\hat{t}_{ij} - \hat{t}_{i})^2}{n_{i}(n_{i} - 1)}
 \]</span></p>
-<p>where <span class="math inline">\(n_{i}\)</span> is the number of sample observations in primary sample unit <span class="math inline">\(i\)</span></p>
+<p>where <span class="math inline">\(n_{i}\)</span> is the number of sample observations in primary sample unit <span class="math inline">\(i\)</span> and <span class="math inline">\(\hat{t}_{i}\)</span> is the estimate of the total for the <span class="math inline">\(i\)</span>th sample unit.</p>
 <p><span class="math inline">\(\hat{t}_{ij}\)</span> is the <span class="math inline">\(j\)</span>th estimate of the total on the <span class="math inline">\(i\)</span>th primary sample unit. In this case, we observed the cubic feet per acre on each plot then multiplied by stand acres to get total cubic feet.</p>
 <p>The Sen-Yates-Grundy formulation of the variance calculation requires each observation to be compared to the rest of the observations in the sample. There may be a more elegant way to code that part, but for now this is what I have come up with:</p>
 <pre class="r"><code># Sen-Yates-Grundy formulation
