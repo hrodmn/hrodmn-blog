@@ -759,6 +759,11 @@ simFrameSRS %>%
     axis.ticks.y = element_blank()
   )
 
+```
+
+The wider confidence intervals reflect greater uncertainty in the estimate of the population mean. Notice that the proportion of CIs that contain the true mean is stil ~90%.
+
+```{r simTabSRS, echo=FALSE}
 outTableSRS <- simStatsSRS %>%
   bind_rows(truth %>% select(source, meanCuft)) %>%
   rename(
@@ -772,7 +777,7 @@ pander::pander(
   outTableSRS,
   missing = "-",
   digits = 2,
-  emphasize.strong.rows = which(outTableUnequal$source == "truth"),
+  emphasize.strong.rows = which(outTableSRS$source == "truth"),
   caption = "summary of equal probability sampling simulation"
 )
 

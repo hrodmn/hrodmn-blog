@@ -466,19 +466,57 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
 <h2>Simple random sample</h2>
 <p>To run the same simulation using a simple random sample we just need to make the sample weights equal for all stands. We can use the same Horvitz-Thompson estimators since the only things we have changed are the inclusion probabilities.</p>
 <p>The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.</p>
-</div>
-<div id="section" class="section level2">
-<h2><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simStatsSRS-1.png" width="672" /></h2>
-<p>source # average 90% CI proportion sampled sample of CIs<br />
-stands cu. ft. containing per/ac true<br />
-mean<br />
-———– ——— ———- ——– ———— estimate 10 2372 974 0.88</p>
-<p>estimate 20 2384 616 0.96</p>
-<p>estimate 30 2276 439 0.92</p>
-</div>
-<div id="truth---2336----" class="section level2">
-<h2><strong>truth</strong> <strong>-</strong> <strong>2336</strong> <strong>-</strong> <strong>-</strong></h2>
-<p>Table: summary of equal probability sampling simulation</p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simStatsSRS-1.png" width="672" /></p>
+<p>The wider confidence intervals reflect greater uncertainty in the estimate of the population mean. Notice that the proportion of CIs that contain the true mean is stil ~90%.</p>
+<table style="width:75%;">
+<caption>summary of equal probability sampling simulation</caption>
+<colgroup>
+<col width="16%" />
+<col width="13%" />
+<col width="15%" />
+<col width="12%" />
+<col width="16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">source</th>
+<th align="center"># sampled stands</th>
+<th align="center">average sample cu. ft. per/ac</th>
+<th align="center">90% CI</th>
+<th align="center">proportion of CIs containing true mean</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">estimate</td>
+<td align="center">10</td>
+<td align="center">2372</td>
+<td align="center">974</td>
+<td align="center">0.88</td>
+</tr>
+<tr class="even">
+<td align="center">estimate</td>
+<td align="center">20</td>
+<td align="center">2384</td>
+<td align="center">616</td>
+<td align="center">0.96</td>
+</tr>
+<tr class="odd">
+<td align="center">estimate</td>
+<td align="center">30</td>
+<td align="center">2276</td>
+<td align="center">439</td>
+<td align="center">0.92</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>truth</strong></td>
+<td align="center"><strong>-</strong></td>
+<td align="center"><strong>2336</strong></td>
+<td align="center"><strong>-</strong></td>
+<td align="center"><strong>-</strong></td>
+</tr>
+</tbody>
+</table>
 <p>We can see that the unequal probability sample yields much more stable estimates with higher precision. This demonstrates how we can save lots of time and energy with a bit of extra work during the sample design phase of a resource assessment project.</p>
 <p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simComp-1.png" width="672" /></p>
 </div>
