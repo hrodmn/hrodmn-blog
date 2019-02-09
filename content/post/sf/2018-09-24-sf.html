@@ -5,11 +5,6 @@ date: "2018-09-24"
 categories: ["R"]
 tags: ["sf", "geospatial"]
 
-output:
-  md_document:
-    variant: markdown_github
-    fig_width: 7
-    preserve_yaml: true
 ---
 
 
@@ -42,13 +37,17 @@ output:
 <h3>Download some data</h3>
 <p>The ecological supersections make a cool spatial dataset that describe large ecological provinces across the continental US.</p>
 <pre class="r"><code># import supersection shapefile
-if(!file.exists(&quot;/tmp/gis-supersection-shape-file.zip&quot;)) {
-  download.file(url = &quot;https://www.arb.ca.gov/cc/capandtrade/protocols/usforest/2014/supersectionshapefiles/gis-supersection-shape-file.zip&quot;,
-                destfile = &quot;/tmp/gis-supersection-shape-file.zip&quot;)
-  
+if (!file.exists(&quot;/tmp/gis-supersection-shape-file.zip&quot;)) {
+  download.file(
+    url = &quot;https://www.arb.ca.gov/cc/capandtrade/protocols/usforest/2014/supersectionshapefiles/gis-supersection-shape-file.zip&quot;,
+    destfile = &quot;/tmp/gis-supersection-shape-file.zip&quot;
+  )
 }
 
-unzip(zipfile = &quot;/tmp/gis-supersection-shape-file.zip&quot;, exdir = &quot;/tmp/super&quot;)
+unzip(
+  zipfile = &quot;/tmp/gis-supersection-shape-file.zip&quot;,
+  exdir = &quot;/tmp/super&quot;
+)
 superFile &lt;- &quot;/tmp/super/Supersections/Supersections.shp&quot;</code></pre>
 </div>
 <div id="reading-in-spatial-data" class="section level3">
@@ -97,15 +96,19 @@ superFile &lt;- &quot;/tmp/super/Supersections/Supersections.shp&quot;</code></p
 <h3>Plotting</h3>
 <p>sf objects can be plotted using base R plotting methods, but the <code>ggplot</code> method creates really nice looking maps with a familiar interface to many users.</p>
 <pre class="r"><code>ggplot() +
-  geom_sf(data = supersectionShape,
-          size = 0.5,
-          color = &quot;black&quot;,
-          alpha = 0) +
+  geom_sf(
+    data = supersectionShape,
+    size = 0.5,
+    color = &quot;black&quot;,
+    alpha = 0
+  ) +
   theme_bw() +
   coord_sf() +
-  labs(title = &quot;Ecological Supersections&quot;,
-       subtitle = &quot;Map of the ecological supersections in the continental US&quot;,
-       caption = &quot;Source: CA ARB&quot;)</code></pre>
+  labs(
+    title = &quot;Ecological Supersections&quot;,
+    subtitle = &quot;Map of the ecological supersections in the continental US&quot;,
+    caption = &quot;Source: CA ARB&quot;
+  )</code></pre>
 <div class="figure"><span id="fig:ggplotting"></span>
 <img src="/post/sf/2018-09-24-sf_files/figure-html/ggplotting-1.png" alt="Map of ecological supersections in continental US" width="672" />
 <p class="caption">
@@ -130,26 +133,34 @@ Figure 1: Map of ecological supersections in continental US
 <p>It does not share the same projection, so we are going to need to reproject before we perform any spatial joins.</p>
 <p>If we want to know which supersections are present in the state of Minnesota, we can perform a spatial join to answer that question. The type of join performed by <code>st_join</code> defaults to “intersect” (<code>st_intersect</code>), but can be set to one of these instead: <code>st_disjoint</code>, <code>st_touches</code>, <code>st_crosses</code>, <code>st_within</code>, <code>st_contains</code>, <code>st_overlaps</code>, <code>st_covers</code>, <code>st_covered_by</code>, <code>st_equals</code>, or <code>st_equals_exact</code>.</p>
 <pre class="r"><code>mnSupersections &lt;- supersectionShape %&gt;%
-  st_join(st_transform(us_states, crs = 4326),
-          join = st_intersects) %&gt;%
+  st_join(
+    st_transform(us_states, crs = 4326),
+    join = st_intersects
+  ) %&gt;%
   filter(NAME == &quot;Minnesota&quot;)</code></pre>
 <pre><code>## although coordinates are longitude/latitude, st_intersects assumes that they are planar</code></pre>
 <pre class="r"><code>mn &lt;- us_states %&gt;%
   filter(NAME == &quot;Minnesota&quot;)</code></pre>
 <pre class="r"><code>ggplot() +
-  geom_sf(data = mn,
-          size = 0.5,
-          fill = &quot;blue&quot;,
-          alpha = 0.2) +
-  geom_sf(data = mnSupersections,
-          size = 0.5,
-          color = &quot;black&quot;,
-          alpha = 0) +
+  geom_sf(
+    data = mn,
+    size = 0.5,
+    fill = &quot;blue&quot;,
+    alpha = 0.2
+  ) +
+  geom_sf(
+    data = mnSupersections,
+    size = 0.5,
+    color = &quot;black&quot;,
+    alpha = 0
+  ) +
   theme_bw() +
   coord_sf() +
-  labs(title = &quot;Ecological Supersections in MN&quot;,
-       subtitle = &quot;Map of the ecological supersections in Minnesota&quot;,
-       caption = &quot;Source: CA ARB&quot;)</code></pre>
+  labs(
+    title = &quot;Ecological Supersections in MN&quot;,
+    subtitle = &quot;Map of the ecological supersections in Minnesota&quot;,
+    caption = &quot;Source: CA ARB&quot;
+  )</code></pre>
 <p><img src="/post/sf/2018-09-24-sf_files/figure-html/mnPlots-1.png" width="672" /></p>
 </div>
 <div id="dissolving" class="section level3">
@@ -160,11 +171,13 @@ Figure 1: Map of ecological supersections in continental US
   summarize()
 
 ggplot() +
-  geom_sf(data = regions,
-          aes(fill = REGION),
-          size = 0.5,
-          color = &quot;black&quot;,
-          alpha = 1) +
+  geom_sf(
+    data = regions,
+    aes(fill = REGION),
+    size = 0.5,
+    color = &quot;black&quot;,
+    alpha = 1
+  ) +
   theme_bw() +
   coord_sf()</code></pre>
 <p><img src="/post/sf/2018-09-24-sf_files/figure-html/dissolve-1.png" width="672" /></p>
@@ -173,42 +186,61 @@ ggplot() +
 <h3>Bonus: working with rasters</h3>
 <p>Operations between rasters and <code>sf</code> objects are the same as before: load the raster using the raster package, summarize/extract raster data to vector layer using the <code>extract</code> function. Look for an update to this post once I see if there is a tidy way to summarize rasters within the piping framework!</p>
 <pre class="r"><code># download low resolution climate rasters
-if(!file.exists(&quot;/tmp/climate-rasts.zip&quot;)) {
-  download.file(url = &quot;http://biogeo.ucdavis.edu/data/worldclim/v2.0/tif/base/wc2.0_10m_tavg.zip&quot;,
-                destfile = &quot;/tmp/climate-rasts.zip&quot;)
-  
+if (!file.exists(&quot;/tmp/climate-rasts.zip&quot;)) {
+  download.file(
+    url = &quot;http://biogeo.ucdavis.edu/data/worldclim/v2.0/tif/base/wc2.0_10m_tavg.zip&quot;,
+    destfile = &quot;/tmp/climate-rasts.zip&quot;
+  )
 }
 
-unzip(zipfile = &quot;/tmp/climate-rasts.zip&quot;, exdir = &quot;/tmp/climate-rasts&quot;)
-rasts &lt;- list.files(&quot;/tmp/climate-rasts&quot;, full.names = TRUE)</code></pre>
+unzip(
+  zipfile = &quot;/tmp/climate-rasts.zip&quot;,
+  exdir = &quot;/tmp/climate-rasts&quot;
+)
+rasts &lt;- list.files(
+  &quot;/tmp/climate-rasts&quot;,
+  full.names = TRUE
+)</code></pre>
 <p>The climate rasters downloaded in the previous step represent the mean temperature by month at ~340 km2 resolution. For a real analysis, we would want the weighted mean temperature for each polygon (weighted on proportion of each raster cell falling within each polygon), but that takes a lot longer so we will just get the mean of intersecting cells.</p>
-<pre class="r"><code>janTemp &lt;- raster::raster(rasts[grepl(&quot;tavg_01.tif&quot;, rasts)])
+<pre class="r"><code>janTemp &lt;- raster::raster(
+  rasts[grepl(&quot;tavg_01.tif&quot;, rasts)]
+)
 
 # reproject supersection shape to match raster
-supersectionShape2 &lt;- st_transform(supersectionShape,
-                                   crs = raster::projection(janTemp))
+supersectionShape2 &lt;- st_transform(
+  supersectionShape,
+  crs = raster::projection(janTemp)
+)
 
 # extract mean temp (C) for month of January for each polygon
-janTemp &lt;- raster::extract(janTemp,
-                           as(supersectionShape2, &quot;Spatial&quot;),
-                           fun = mean, weights = FALSE,
-                           na.rm = TRUE)
+janTemp &lt;- raster::extract(
+  janTemp,
+  as(supersectionShape2, &quot;Spatial&quot;),
+  fun = mean, weights = FALSE,
+  na.rm = TRUE
+)
 
 supersectionShape2$janTemp &lt;- janTemp
 
 janPlot &lt;- ggplot() +
-  geom_sf(data = supersectionShape2,
-          aes(fill = janTemp),
-          size = 0.5,
-          color = &quot;black&quot;,
-          alpha = 1) +
-  scale_fill_gradient2(high = &quot;red&quot;, low = &quot;blue&quot;,
-                       name = &quot;Mean Temp (C)&quot;) +
+  geom_sf(
+    data = supersectionShape2,
+    aes(fill = janTemp),
+    size = 0.5,
+    color = &quot;black&quot;,
+    alpha = 1
+  ) +
+  scale_fill_gradient2(
+    high = &quot;red&quot;, low = &quot;blue&quot;,
+    name = &quot;Mean Temp (C)&quot;
+  ) +
   theme_bw() +
   coord_sf() +
-  labs(title = &quot;Temperature across Ecological Supersections&quot;,
-       subtitle = &quot;Mean January temperature (C) by ecological supersection&quot;,
-       caption = &quot;Source: CA ARB, WorldClim 2.0&quot;)</code></pre>
+  labs(
+    title = &quot;Temperature across Ecological Supersections&quot;,
+    subtitle = &quot;Mean January temperature (C) by ecological supersection&quot;,
+    caption = &quot;Source: CA ARB, WorldClim 2.0&quot;
+  )</code></pre>
 <p>Mapping mean temp in January confirms what we already knew: Minnesota is cold!</p>
 <p><img src="/post/sf/2018-09-24-sf_files/figure-html/meanJanTemp-1.png" width="672" /></p>
 </div>

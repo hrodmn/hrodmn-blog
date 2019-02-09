@@ -12,7 +12,7 @@ header:
 
 ```{r setup, include=FALSE}
 pander::panderOptions(
-  'table.split.cells', 8
+  'table.split.cells', 12
 )
 pander::panderOptions(
   'table.split.table', Inf
@@ -30,6 +30,8 @@ theme_set(theme_bw())
 The application of statistical survey sampling techniques to the assessment of forest resources (aka forest inventory) has been elemental to improvements in forest management practices across the globe. Sampling methods that can efficiently yield accurate and precise estimates are preferred by forest managers because collecting forest inventory data is difficult and expensive!
 
 Two-stage sampling is useful in forest inventory because it can improve efficiency by reducing the number of stands (primary sample units) that are visited and by using auxilliary information for selecting sampled stands. This official name for this type of sample design is an _unequal probability without replacement, two-stage sample_. Unequal probability sampling is well documented in statistical textbooks, but the estimators for sample variance are much more complex than those for sample designs with equal probability and/or with replacement.
+
+![](static/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simComp-1.png)
 
 I dug around the internet, textbooks, and through my old lecture notes from forest mensuration courses and could not find a complete demonstration of a two-stage sample where the primary sample units were selected with unequal probability. The Horvitz-Thompson estimators provide most of the solution, but they need to be extended slightly to account for the variance from the second stage (sample variance within individual stands). There is much uncertainty about the best way to compute the inclusion probabilities, so I have devised a brute force simulation approach to estimating those.
 
@@ -316,7 +318,15 @@ $$
 \sum_{i \in S} \displaystyle \frac{\hat{V}(\hat{t_{i}})}{\pi_{i}}
 $$
 
-where $\pi_{ik}$ is the joint inclusion probability for primary sampling units $i$ and $k$ and $\hat{V}(\hat{t_{i}})$ is the variance of the estimate for the $i$th sample unit.
+where $\pi_{ik}$ is the joint inclusion probability for primary sampling units $i$ and $k$ and $\hat{V}(\hat{t_{i}})$ is the variance of the estimate for the $i$th sample unit:
+
+$$
+\hat{V}(\hat{t_{i}}) = \displaystyle \frac{\sum_{j=1}^{n_{j}}(\hat{t}_{ij} - \hat{t}_{i})^2}{n_{i}(n_{i} - 1)}
+$$
+
+where $n_{i}$ is the number of sample observations in primary sample unit $i$
+
+$\hat{t}_{ij}$ is the $j$th estimate of the total on the $i$th primary sample unit. In this case, we observed the cubic feet per acre on each plot then multiplied by stand acres to get total cubic feet.
 
 The Sen-Yates-Grundy formulation of the variance calculation requires each observation to be compared to the rest of the observations in the sample. There may be a more elegant way to code that part, but for now this is what I have come up with:
 ```{r varianceCalcFunction}
@@ -373,7 +383,8 @@ standDat %>%
   geom_point() +
   geom_errorbar(aes(ymin = tHat - 1.7 * se, ymax = tHat + 1.7 * se)) +
   geom_abline() +
-  xlab(bquote("true total volume (" ~ ft^{3} ~ ")"))
+  xlab(bquote("true total volume (" ~ ft^{3} ~ ")"))+
+  ylab(bquote("estimated total volume (" ~ ft^{3} ~ ")"))
 
 ```
 
