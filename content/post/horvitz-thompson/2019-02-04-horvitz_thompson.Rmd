@@ -31,8 +31,6 @@ The application of statistical survey sampling techniques to the assessment of f
 
 Two-stage sampling is useful in forest inventory because it can improve efficiency by reducing the number of stands (primary sample units) that are visited and by using auxilliary information for selecting sampled stands. This official name for this type of sample design is an _unequal probability without replacement, two-stage sample_. Unequal probability sampling is well documented in statistical textbooks, but the estimators for sample variance are much more complex than those for sample designs with equal probability and/or with replacement.
 
-![](static/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simComp-1.png)
-
 I dug around the internet, textbooks, and through my old lecture notes from forest mensuration courses and could not find a complete demonstration of a two-stage sample where the primary sample units were selected with unequal probability. The Horvitz-Thompson estimators provide most of the solution, but they need to be extended slightly to account for the variance from the second stage (sample variance within individual stands). There is much uncertainty about the best way to compute the inclusion probabilities, so I have devised a brute force simulation approach to estimating those.
 
 ## Objectives
