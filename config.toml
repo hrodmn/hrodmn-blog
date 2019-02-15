@@ -10,13 +10,10 @@ title = "hrodmn"
 # The URL of your site.
 # End your URL with a `/` trailing slash, e.g. `https://example.com/`.
 baseurl = "/"
-
+googleAnalytics = "UA-133820254-1"
 # Enter a copyright notice to display in the site footer.
 # To display a copyright symbol, type `&copy;`.
 copyright = ""
-
-# Enable analytics by entering your Google Analytics tracking ID
-GoogleAnalytics = "UA-133820254-1"
 
 # Enable comments by entering your Disqus shortname
 disqusShortname = ""
