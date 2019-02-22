@@ -341,7 +341,7 @@ where $S$ is the sample of primary sample units from population sized $N$
 The Sen-Yates-Grundy estimator for variance of the population total is:
 
 $$
-\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k < i}}
+\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k > i}}
 \displaystyle \frac{\pi_{ik} - \pi_{i}\pi_{k}}{\pi_{ik}} \left(\frac{\hat{t}_{i}}{\pi_{i}} - \frac{\hat{t}_{k}}{\pi_{k}}\right)^{2}+
 \sum_{i \in S} \displaystyle \frac{\hat{V}(\hat{t_{i}})}{\pi_{i}}
 $$

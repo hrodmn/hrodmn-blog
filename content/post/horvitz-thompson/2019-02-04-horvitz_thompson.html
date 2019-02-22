@@ -307,7 +307,7 @@ stands %&gt;%
 where <span class="math inline">\(S\)</span> is the sample of primary sample units from population sized <span class="math inline">\(N\)</span></p>
 <p>The Sen-Yates-Grundy estimator for variance of the population total is:</p>
 <p><span class="math display">\[
-\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k &lt; i}}
+\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k &gt; i}}
 \displaystyle \frac{\pi_{ik} - \pi_{i}\pi_{k}}{\pi_{ik}} \left(\frac{\hat{t}_{i}}{\pi_{i}} - \frac{\hat{t}_{k}}{\pi_{k}}\right)^{2}+
 \sum_{i \in S} \displaystyle \frac{\hat{V}(\hat{t_{i}})}{\pi_{i}}
 \]</span></p>
