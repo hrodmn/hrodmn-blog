@@ -31,7 +31,9 @@ The application of statistical survey sampling techniques to the assessment of f
 
 Two-stage sampling is useful in forest inventory because it can improve efficiency by reducing the number of stands (primary sample units) that are visited and by using auxilliary information for selecting sampled stands. This official name for this type of sample design is an _unequal probability without replacement, two-stage sample_. Unequal probability sampling is well documented in statistical textbooks, but the estimators for sample variance are much more complex than those for sample designs with equal probability and/or with replacement.
 
-I dug around the internet, textbooks, and through my old lecture notes from forest mensuration courses and could not find a complete demonstration of a two-stage sample where the primary sample units were selected with unequal probability. The Horvitz-Thompson estimators provide most of the solution, but they need to be extended slightly to account for the variance from the second stage (sample variance within individual stands). There is much uncertainty about the best way to compute the inclusion probabilities, so I have devised a brute force simulation approach to estimating those.
+The Horvitz-Thompson estimators provide the framework for unequal probability sampling, but they need to be extended slightly to account for the variance from the second stage (sample variance within primary sample units). In fact, the Horvitz-Thompson estimators are sound for most design-based probability samples and can be reduced to the most commonly referenced equations for more ubiquitous sampling methods (e.g. simple random sampling with replacement).
+
+The inspiration for this exercise was my struggle to compute inclusion probabilities for a sample drawn without replacement. Many references describe the computational complexity of obtaining the unconditional probability of inclusion for an element but do not provide an example or a reliable approximation, so I have devised a brute force simulation approach to estimating those probabilities.
 
 ## Objectives
 Let's say that I am a forest manager that needs an estimate of the volume of standing trees in a tract of forest land. I want to obtain an accurate estimate for the lowest price possible. I am willing to pay more for a more precise estimate, but do not need an estimate that is more precise than +/- 10% at 90% confidence. In statistical terms, I would like the half-width of the 90% confidence interval to be roughly 10% of the estimate of the total volume.
@@ -106,46 +108,68 @@ stands %>%
 
 We need to estimate the inclusion probabilities ($\pi_{i}$) for all stands as well as the joint inclusion probabilities ($\pi_{ij}$) for all pairs of stands. We can accomplish this with a simulation.
 ```{r inclusionProbablities}
-simulate_sample <- function(sims, stands, nSamp, cores) {
+simulate_sample <- function(sims = 10000, stands, n, weight_var,
+                            id_var, cores) {
+  weight_var <- enquo(weight_var)
+  id_var <- enquo(id_var)
+  
+  allIds <- stands %>% pull(!! id_var)
+  
   simFrame <- bind_rows(
     parallel::mclapply(1:sims,
       function(i, ...) {
         stands %>%
-          sample_n(nSamp, weight = prop)
+          sample_n(n, weight = !! weight_var)
       },
       mc.cores = cores
     ),
     .id = "sim"
   )
-  out <- list(
+  
+  sampledIds <- simFrame %>% pull(!! id_var)
+  
+  if (!all(allIds %in% sampledIds)) {
+    missing <- allIds[!allIds %in% sampledIds]
+    warning(
+      paste0(
+        "these elements that were not included in any sample: ",
+        paste(missing, collapse = " ")
+      )
+    )
+  }
+  
+  list(
     simFrame = simFrame,
     sims = sims,
-    nSamp = nSamp,
-    ids = stands$id
+    n = n,
+    ids = allIds
   )
-  return(out)
 }
 
-estimate_pi_i <- function(simList) {
-  simList[["simFrame"]] %>%
-    group_by(id) %>%
-    summarize(pi_i_sim = n() / simList[["sims"]]) %>%
-    left_join(stands, by = "id") %>%
-    mutate(
-      pi_i_approx = simList[["nSamp"]] * prop
-    ) %>%
-    select(id, pi_i_sim, pi_i_approx, prop)
-}
-
-estimate_joint_probs <- function(simList, cores) {
-  ids <- unique(simList[["simFrame"]]$id)
-  idxs <- 1:length(ids)
-  # unique pairs of elements
-  pairs <- combn(ids, m = 2, simplify = FALSE)
+estimate_pi_i <- function(simList, id_var) {
+  id_var <- enquo(id_var)
   
-  estimate_joint_prob <- function(pair, simFrame, sims, cores) {
+  simList[["simFrame"]] %>%
+    group_by(!! id_var) %>%
+    summarize(pi_i = n() / simList[["sims"]]) %>%
+    select(!! id_var, pi_i)
+}
+
+estimate_joint_probs <- function(simList, id_var, pairs = NULL, cores) {
+  id_var <- enquo(id_var)
+  
+  if(is.null(pairs)) {
+    ids <- simList[["ids"]]
+    idxs <- 1:length(ids)
+    pairs <- combn(ids, m = 2, simplify = FALSE)
+  } else {
+    ids <- unique(unlist(pairs))
+    idxs <- 1:length(ids)
+  }
+
+  estimate_joint_prob <- function(pair, simFrame, sims, cores, id_var) {
     simFrame %>%
-      filter(id %in% pair) %>%
+      filter(!! id_var %in% pair) %>%
       group_by(sim) %>%
       mutate(n = n()) %>%
       filter(n > 1) %>%
@@ -168,6 +192,7 @@ estimate_joint_probs <- function(simList, cores) {
       pairs,
       estimate_joint_prob,
       simFrame = simList[["simFrame"]],
+      id_var = id_var,
       sims = simList[["sims"]],
       mc.cores = cores
     )
@@ -187,23 +212,28 @@ estimate_joint_probs <- function(simList, cores) {
 simList20 <- simulate_sample(
   sims = 10000,
   stands = stands,
-  nSamp = 20,
+  n = 20,
+  id_var = id,
+  weight_var = prop,
   cores = 2
 )
 
-sampleSim20 <- estimate_pi_i(simList = simList20)
+sampleSim20 <- estimate_pi_i(simList = simList20, id_var = id)
 
 jointProbs <- estimate_joint_probs(
   simList = simList20,
+  id_var = id,
   cores = 2
 )
 
 sampleSim20 %>%
-  ggplot(aes(x = pi_i_approx, y = pi_i_sim)) +
+  left_join(stands) %>%
+  mutate(pi_i_approx = 20 * prop) %>%
+  ggplot(aes(x = pi_i_approx, y = pi_i)) +
   geom_point() +
   geom_abline() +
-  xlim(0, 1.1 * max(sampleSim20$pi_i_approx)) +
-  ylim(0, 1.1 * max(sampleSim20$pi_i_sim)) +
+  xlim(0, 1.2 * max(sampleSim20$pi_i)) +
+  ylim(0, 1.2 * max(sampleSim20$pi_i)) +
   xlab(bquote("approximate" ~ pi[i])) +
   ylab(bquote("simulated" ~ pi[i]))
 ```
@@ -218,7 +248,7 @@ sampleSim20 %>%
     aes(
       x = acres,
       y = cuftPerAc,
-      color = pi_i_sim)
+      color = pi_i)
     ) +
   geom_point() +
   ylab(bquote("volume (" ~ ft^{3} ~ "/ac)")) +
@@ -230,7 +260,7 @@ sampleSim20 %>%
   left_join(stands) %>%
   ggplot(
     aes(
-      x = pi_i_sim,
+      x = pi_i,
       y = cuftPerAc * acres
     )
   ) +
@@ -257,7 +287,7 @@ sampStands <- stands %>%
   ) %>%
   left_join(
     sampleSim20 %>%
-      select(id, pi_i_sim),
+      select(id, pi_i),
     by = "id"
   ) %>%
   ungroup()
@@ -311,7 +341,7 @@ where $S$ is the sample of primary sample units from population sized $N$
 The Sen-Yates-Grundy estimator for variance of the population total is:
 
 $$
-\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k < i}}
+\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k > i}}
 \displaystyle \frac{\pi_{ik} - \pi_{i}\pi_{k}}{\pi_{ik}} \left(\frac{\hat{t}_{i}}{\pi_{i}} - \frac{\hat{t}_{k}}{\pi_{k}}\right)^{2}+
 \sum_{i \in S} \displaystyle \frac{\hat{V}(\hat{t_{i}})}{\pi_{i}}
 $$
@@ -329,32 +359,49 @@ $\hat{t}_{ij}$ is the $j$th estimate of the total on the $i$th primary sample un
 The Sen-Yates-Grundy formulation of the variance calculation requires each observation to be compared to the rest of the observations in the sample. There may be a more elegant way to code that part, but for now this is what I have come up with:
 ```{r varianceCalcFunction}
 # Sen-Yates-Grundy formulation
-var_syg <- function(row, data, y, pi_i, p,
-                    jointProbs = NULL) {
+var_syg <- function(row, data, y_var, pi_i_var, id_var, jointProbs) {
+  
   data$idx <- 1:nrow(data)
-  a <- data[row, ]
+  i <- data[row, ]
   b <- data[data$idx > row, ]
   n <- nrow(data)
+  
   if(row == max(data$idx)) {
     return(0)
   }
-  message(
-    paste0(
-      "row ", row
+  
+  r <- as.character(i %>% pull(!! id_var))
+  pi_i <- i %>% pull(!! pi_i_var)
+  y_i <- i %>% pull(!! y_var)
+  
+  x <- c()
+  for (l in 1:nrow(b)) {
+    k <- b[l, ]
+    pi_k <- k %>% pull(!! pi_i_var)
+    y_k <- k %>% pull(!! y_var)
+    
+    c <- as.character(k %>% pull(!! id_var))
+    jp <- jointProbs[row.names(jointProbs) == r, c]
+
+    x[l] <- ((pi_i * pi_k - jp) / jp) *
+      (y_i / pi_i - y_k / pi_k)^2
+  }
+  
+  sum(x)
+}
+
+var_syg_wrap <- function(data, y_var, pi_i_var, id_var, jointProbs) {
+  unlist(
+    purrr::map(
+      1:nrow(data),
+      var_syg,
+      data = data,
+      y_var = enquo(y_var),
+      pi_i_var = enquo(pi_i_var),
+      id_var = enquo(id_var),
+      jointProbs = jointProbs
     )
   )
-  x <- list()
-  for (l in 1:nrow(b)) {
-    c <- b[l, ]
-    r <- as.character(a[["id"]])
-    col <- as.character(c[["id"]])
-    jp <- jointProbs[row.names(jointProbs) == r, col]
-
-    x[[l]] <- ((a[[pi_i]] * c[[pi_i]] - jp) / jp) *
-      (a[[y]] / a[[pi_i]] - c[[y]] / c[[pi_i]])^2
-  }
-
-  sum(unlist(x))
 }
 
 ```
@@ -364,7 +411,7 @@ We can start by summarizing the stand-level estimates. For each stand we will es
 ```{r standStats}
 standDat <- plotTab %>%
   left_join(
-    sampStands %>% select(id, acres, cuftPerAc, nPlots, pi_i = pi_i_sim),
+    sampStands %>% select(id, acres, cuftPerAc, nPlots, pi_i),
     by = "id"
   ) %>%
   group_by(id) %>%
@@ -394,25 +441,22 @@ Using the equations listed above we will compute estimates of the population tot
 sampleSummary <- standDat %>%
   left_join(
     sampStands %>%
-      select(id, pi_i = pi_i_sim, prop),
+      select(id, pi_i, prop),
     by = "id"
   ) %>%
   ungroup() %>%
+  nest() %>%
   mutate(
-    var_I_syg = unlist(
-      parallel::mclapply(
-        1:nrow(.),
-        var_syg,
-        data = .,
-        y = "tHat",
-        pi_i = "pi_i",
-        p = "prop",
-        jointProbs = jointProbs,
-        mc.cores = 12
-      )
+    var_I_syg = map(
+      .x = .$data,
+      .f = var_syg_wrap,
+      y_var = tHat,
+      pi_i_var = pi_i,
+      id_var = id,
+      jointProbs = jointProbs
     )
   ) %>%
-  ungroup() %>%
+  unnest() %>%
   summarize(
     totalCuft = sum(tHat / pi_i),
     fpcI = 1,
@@ -475,15 +519,25 @@ simulate_HT <- function(sims, stands, nStands,
   simList <- simulate_sample(
     sims = 10000,
     stands = stands,
-    nSamp = nStands,
-    cores = cores
+    n = nStands,
+    id_var = id,
+    weight_var = prop,
+    cores = 2
   )
+  
   message("simulating pi_i")
-  sampleSim <- estimate_pi_i(simList = simList)
+  sampleSim <- estimate_pi_i(
+    simList = simList,
+    id_var = id
+  )
   
   message("simulating jointProbs")
-  jointProbs <- estimate_joint_probs(simList, cores = cores)
-  
+  jointProbs <- estimate_joint_probs(
+    simList = simList,
+    id_var = id,
+    cores = 2
+  )
+
   out <- bind_rows(
     lapply(
       1:sims,
@@ -504,7 +558,7 @@ simulate_HT <- function(sims, stands, nStands,
           ) %>%
           left_join(
             sampleSim %>%
-              select(id, pi_i = pi_i_sim),
+              select(id, pi_i),
               by = "id"
             ) %>%
           ungroup()
@@ -544,24 +598,20 @@ simulate_HT <- function(sims, stands, nStands,
             by = "id"
           ) %>%
           ungroup() %>%
+          nest() %>%
           mutate(
-            var_I_syg = unlist(
-              parallel::mclapply(
-                1:nrow(.),
-                var_syg,
-                data = .,
-                y = "tHat",
-                pi_i = "pi_i",
-                p = "prop",
-                jointProbs = jointProbs,
-                mc.cores = cores
-              )
+            var_I_syg = map(
+              .x = .$data,
+              .f = var_syg_wrap,
+              y_var = tHat,
+              pi_i_var = pi_i,
+              id_var = id,
+              jointProbs = jointProbs
             )
           ) %>%
-          ungroup() %>%
+          unnest() %>%
           summarize(
             totalCuft = sum(tHat / pi_i),
-            # fpcI = 1 - n() / nrow(stands),
             fpcI = 1,
             fpcII = 1,
             varI = sum(var_I_syg),

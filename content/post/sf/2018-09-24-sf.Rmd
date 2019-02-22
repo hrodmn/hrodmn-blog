@@ -6,7 +6,12 @@ categories: ["R"]
 tags: ["sf", "geospatial"]
 
 ---
-
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(
+  cache = TRUE,
+  message = FALSE
+)
+```
 The **sf** package is the successor to the common suite of geospatial analysis packages for R: sp, rgdal, and rgeos. This is a good thing because sf provides a unified solution to most of the geospatial operations that are often used within R.
 
 The way you interact with spatial data in the sf universe is more intuitive than in the past because the structure of the sf class in R is very simple relative to the sp class. An object of the sf class consists of a normal data.frame with a geometry column that contains the geometry for each feature. That may not sound very exciting, but it makes for a much easier time when manipulating and summarizing spatial data.

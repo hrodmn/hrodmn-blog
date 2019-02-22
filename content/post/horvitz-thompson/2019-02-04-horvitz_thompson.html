@@ -14,7 +14,8 @@ header:
 
 <p>The application of statistical survey sampling techniques to the assessment of forest resources (aka forest inventory) has been elemental to improvements in forest management practices across the globe. Sampling methods that can efficiently yield accurate and precise estimates are preferred by forest managers because collecting forest inventory data is difficult and expensive!</p>
 <p>Two-stage sampling is useful in forest inventory because it can improve efficiency by reducing the number of stands (primary sample units) that are visited and by using auxilliary information for selecting sampled stands. This official name for this type of sample design is an <em>unequal probability without replacement, two-stage sample</em>. Unequal probability sampling is well documented in statistical textbooks, but the estimators for sample variance are much more complex than those for sample designs with equal probability and/or with replacement.</p>
-<p>I dug around the internet, textbooks, and through my old lecture notes from forest mensuration courses and could not find a complete demonstration of a two-stage sample where the primary sample units were selected with unequal probability. The Horvitz-Thompson estimators provide most of the solution, but they need to be extended slightly to account for the variance from the second stage (sample variance within individual stands). There is much uncertainty about the best way to compute the inclusion probabilities, so I have devised a brute force simulation approach to estimating those.</p>
+<p>The Horvitz-Thompson estimators provide the framework for unequal probability sampling, but they need to be extended slightly to account for the variance from the second stage (sample variance within primary sample units). In fact, the Horvitz-Thompson estimators are sound for most design-based probability samples and can be reduced to the most commonly referenced equations for more ubiquitous sampling methods (e.g. simple random sampling with replacement).</p>
+<p>The inspiration for this exercise was my struggle to compute inclusion probabilities for a sample drawn without replacement. Many references describe the computational complexity of obtaining the unconditional probability of inclusion for an element but do not provide an example or a reliable approximation, so I have devised a brute force simulation approach to estimating those probabilities.</p>
 <div id="objectives" class="section level2">
 <h2>Objectives</h2>
 <p>Let’s say that I am a forest manager that needs an estimate of the volume of standing trees in a tract of forest land. I want to obtain an accurate estimate for the lowest price possible. I am willing to pay more for a more precise estimate, but do not need an estimate that is more precise than +/- 10% at 90% confidence. In statistical terms, I would like the half-width of the 90% confidence interval to be roughly 10% of the estimate of the total volume.</p>
@@ -57,7 +58,8 @@ stands %&gt;%
   geom_point() +
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;)) +
   labs(caption = &quot;volume over age for the forest&quot;)</code></pre>
-<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" /> The true population mean stocking is 2336 cubic feet per acre, the population total is 2.326763110^{7} cubic feet!</p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/data-1.png" width="672" />
+The true population mean stocking is 2336 cubic feet per acre, the population total is 2.326763110^{7} cubic feet!</p>
 </div>
 <div id="designing-a-two-stage-sample" class="section level2">
 <h2>Designing a two-stage sample</h2>
@@ -68,7 +70,8 @@ stands %&gt;%
 <p>The population of stands could be sampled randomly, but since we are trying to obtain an estimate of total volume for the property, we need to make sure that we sample the stands that a) contribute the most to the total volume, and b) contribute the most variance to the population. Using the Horvitz-Thompson estimators, we can sample the stands however we want so long as we know the probability of each stand being included in the sample! This is a case of unequal probability sampling and the Horvitz-Thompson estimators will be statistically efficient if the probability of inclusion for each primary sampling unit is correlated with the variable of interest. In this case, we are going to weight our sample on age x acres since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume.</p>
 <div id="inclusion-probability" class="section level4">
 <h4>Inclusion probability</h4>
-<p>Some references approximate <span class="math inline">\(\pi_{i}\)</span> using <span class="math inline">\(n * p_{i}\)</span> where <span class="math inline">\(p_{i}\)</span> is the sampling weight for the <span class="math inline">\(i\)</span>th primary sample unit. This works fine when sampling with replacement, but sampling without replacement is slightly more complicated. The probability of including the <span class="math inline">\(i\)</span>th element on the <span class="math inline">\(k\)</span>th draw depends on the elements that were drawn in all draws <span class="math inline">\(1:k\)</span>. The distinction between <span class="math inline">\(p_{i}\)</span> and <span class="math inline">\(\pi_{i}\)</span> is very important. Think of <span class="math inline">\(\pi_{i}\)</span> as the likelihood of including the <span class="math inline">\(i\)</span>th element unconditional on the other elements selected in the sample. This can be calculated by computing the proportion of all possible samples where an element is selected but that sounds very difficult. Instead we will use the power of simulation to obtain an approximation of <span class="math inline">\(\pi_{i}\)</span> for each stand.</p>
+<p>Some references approximate <span class="math inline">\(\pi_{i}\)</span> using <span class="math inline">\(n * p_{i}\)</span> where <span class="math inline">\(p_{i}\)</span> is the sampling weight for the <span class="math inline">\(i\)</span>th primary sample unit. This works fine when sampling with replacement, but sampling without replacement is slightly more complicated. The probability of including the <span class="math inline">\(i\)</span>th element on the <span class="math inline">\(k\)</span>th draw depends on the elements that were drawn in all draws <span class="math inline">\(1:k\)</span>.
+The distinction between <span class="math inline">\(p_{i}\)</span> and <span class="math inline">\(\pi_{i}\)</span> is very important. Think of <span class="math inline">\(\pi_{i}\)</span> as the likelihood of including the <span class="math inline">\(i\)</span>th element unconditional on the other elements selected in the sample. This can be calculated by computing the proportion of all possible samples where an element is selected but that sounds very difficult. Instead we will use the power of simulation to obtain an approximation of <span class="math inline">\(\pi_{i}\)</span> for each stand.</p>
 <p>For this sample we are going to weight our sample on <code>age * acres</code> since we believe the oldest stands are going to have the greatest stocking, and that the largest stands have the greatest total volume. We have decided that we are going to sample 20 stands and install either one plot per 8 acres or 30 plots per stand, whichever is fewer.</p>
 <pre class="r"><code>stands$prop &lt;- (stands$age * stands$acres) /
   sum(stands$age * stands$acres)
@@ -79,46 +82,68 @@ stands %&gt;%
   ylab(bquote(&quot;total volume (&quot; ~ ft^{3} ~ &quot;)&quot;))</code></pre>
 <p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/sampleWeightsPlot-1.png" width="672" /></p>
 <p>We need to estimate the inclusion probabilities (<span class="math inline">\(\pi_{i}\)</span>) for all stands as well as the joint inclusion probabilities (<span class="math inline">\(\pi_{ij}\)</span>) for all pairs of stands. We can accomplish this with a simulation.</p>
-<pre class="r"><code>simulate_sample &lt;- function(sims, stands, nSamp, cores) {
+<pre class="r"><code>simulate_sample &lt;- function(sims = 10000, stands, n, weight_var,
+                            id_var, cores) {
+  weight_var &lt;- enquo(weight_var)
+  id_var &lt;- enquo(id_var)
+  
+  allIds &lt;- stands %&gt;% pull(!! id_var)
+  
   simFrame &lt;- bind_rows(
     parallel::mclapply(1:sims,
       function(i, ...) {
         stands %&gt;%
-          sample_n(nSamp, weight = prop)
+          sample_n(n, weight = !! weight_var)
       },
       mc.cores = cores
     ),
     .id = &quot;sim&quot;
   )
-  out &lt;- list(
+  
+  sampledIds &lt;- simFrame %&gt;% pull(!! id_var)
+  
+  if (!all(allIds %in% sampledIds)) {
+    missing &lt;- allIds[!allIds %in% sampledIds]
+    warning(
+      paste0(
+        &quot;these elements that were not included in any sample: &quot;,
+        paste(missing, collapse = &quot; &quot;)
+      )
+    )
+  }
+  
+  list(
     simFrame = simFrame,
     sims = sims,
-    nSamp = nSamp,
-    ids = stands$id
+    n = n,
+    ids = allIds
   )
-  return(out)
 }
 
-estimate_pi_i &lt;- function(simList) {
-  simList[[&quot;simFrame&quot;]] %&gt;%
-    group_by(id) %&gt;%
-    summarize(pi_i_sim = n() / simList[[&quot;sims&quot;]]) %&gt;%
-    left_join(stands, by = &quot;id&quot;) %&gt;%
-    mutate(
-      pi_i_approx = simList[[&quot;nSamp&quot;]] * prop
-    ) %&gt;%
-    select(id, pi_i_sim, pi_i_approx, prop)
-}
-
-estimate_joint_probs &lt;- function(simList, cores) {
-  ids &lt;- unique(simList[[&quot;simFrame&quot;]]$id)
-  idxs &lt;- 1:length(ids)
-  # unique pairs of elements
-  pairs &lt;- combn(ids, m = 2, simplify = FALSE)
+estimate_pi_i &lt;- function(simList, id_var) {
+  id_var &lt;- enquo(id_var)
   
-  estimate_joint_prob &lt;- function(pair, simFrame, sims, cores) {
+  simList[[&quot;simFrame&quot;]] %&gt;%
+    group_by(!! id_var) %&gt;%
+    summarize(pi_i = n() / simList[[&quot;sims&quot;]]) %&gt;%
+    select(!! id_var, pi_i)
+}
+
+estimate_joint_probs &lt;- function(simList, id_var, pairs = NULL, cores) {
+  id_var &lt;- enquo(id_var)
+  
+  if(is.null(pairs)) {
+    ids &lt;- simList[[&quot;ids&quot;]]
+    idxs &lt;- 1:length(ids)
+    pairs &lt;- combn(ids, m = 2, simplify = FALSE)
+  } else {
+    ids &lt;- unique(unlist(pairs))
+    idxs &lt;- 1:length(ids)
+  }
+
+  estimate_joint_prob &lt;- function(pair, simFrame, sims, cores, id_var) {
     simFrame %&gt;%
-      filter(id %in% pair) %&gt;%
+      filter(!! id_var %in% pair) %&gt;%
       group_by(sim) %&gt;%
       mutate(n = n()) %&gt;%
       filter(n &gt; 1) %&gt;%
@@ -141,6 +166,7 @@ estimate_joint_probs &lt;- function(simList, cores) {
       pairs,
       estimate_joint_prob,
       simFrame = simList[[&quot;simFrame&quot;]],
+      id_var = id_var,
       sims = simList[[&quot;sims&quot;]],
       mc.cores = cores
     )
@@ -160,26 +186,32 @@ estimate_joint_probs &lt;- function(simList, cores) {
 simList20 &lt;- simulate_sample(
   sims = 10000,
   stands = stands,
-  nSamp = 20,
+  n = 20,
+  id_var = id,
+  weight_var = prop,
   cores = 2
 )
 
-sampleSim20 &lt;- estimate_pi_i(simList = simList20)
+sampleSim20 &lt;- estimate_pi_i(simList = simList20, id_var = id)
 
 jointProbs &lt;- estimate_joint_probs(
   simList = simList20,
+  id_var = id,
   cores = 2
 )
 
 sampleSim20 %&gt;%
-  ggplot(aes(x = pi_i_approx, y = pi_i_sim)) +
+  left_join(stands) %&gt;%
+  mutate(pi_i_approx = 20 * prop) %&gt;%
+  ggplot(aes(x = pi_i_approx, y = pi_i)) +
   geom_point() +
   geom_abline() +
-  xlim(0, 1.1 * max(sampleSim20$pi_i_approx)) +
-  ylim(0, 1.1 * max(sampleSim20$pi_i_sim)) +
+  xlim(0, 1.2 * max(sampleSim20$pi_i)) +
+  ylim(0, 1.2 * max(sampleSim20$pi_i)) +
   xlab(bquote(&quot;approximate&quot; ~ pi[i])) +
   ylab(bquote(&quot;simulated&quot; ~ pi[i]))</code></pre>
-<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/inclusionProbablities-1.png" width="672" /> As you can see, there are subtle differences between the approximate <span class="math inline">\(\pi_{i}\)</span> values and the <span class="math inline">\(\pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
+<p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/inclusionProbablities-1.png" width="672" />
+As you can see, there are subtle differences between the approximate <span class="math inline">\(\pi_{i}\)</span> values and the <span class="math inline">\(\pi_{i}\)</span> values generated from 10,000 simulated samples. We will use the simulated values for the rest of the analysis.</p>
 <p>By plotting <span class="math inline">\(\pi_{i}\)</span> with the true total volume we can see that large stands with high volume stocking have the highest probability of inclusion in a sample of 20 stands.</p>
 <pre class="r"><code>sampleSim20 %&gt;%
   left_join(stands) %&gt;%
@@ -187,7 +219,7 @@ sampleSim20 %&gt;%
     aes(
       x = acres,
       y = cuftPerAc,
-      color = pi_i_sim)
+      color = pi_i)
     ) +
   geom_point() +
   ylab(bquote(&quot;volume (&quot; ~ ft^{3} ~ &quot;/ac)&quot;)) +
@@ -199,7 +231,7 @@ sampleSim20 %&gt;%
   left_join(stands) %&gt;%
   ggplot(
     aes(
-      x = pi_i_sim,
+      x = pi_i,
       y = cuftPerAc * acres
     )
   ) +
@@ -226,7 +258,7 @@ sampStands &lt;- stands %&gt;%
   ) %&gt;%
   left_join(
     sampleSim20 %&gt;%
-      select(id, pi_i_sim),
+      select(id, pi_i),
     by = &quot;id&quot;
   ) %&gt;%
   ungroup()
@@ -268,12 +300,14 @@ stands %&gt;%
 <p>Once we are done cruising it’s time to crunch the numbers!</p>
 <div id="equations" class="section level4">
 <h4>Equations</h4>
-<p>The Horvitz-Thompson estimator for the population total is: <span class="math display">\[
+<p>The Horvitz-Thompson estimator for the population total is:
+<span class="math display">\[
 \hat{t}_{HT} = \sum_{i \in S} \displaystyle \frac{\hat{t}_{i}}{\pi_{i}}
-\]</span> where <span class="math inline">\(S\)</span> is the sample of primary sample units from population sized <span class="math inline">\(N\)</span></p>
+\]</span>
+where <span class="math inline">\(S\)</span> is the sample of primary sample units from population sized <span class="math inline">\(N\)</span></p>
 <p>The Sen-Yates-Grundy estimator for variance of the population total is:</p>
 <p><span class="math display">\[
-\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k &lt; i}}
+\hat{V}(\hat{t}_{HT}) = \sum_{i \in S} \sum_{\substack{k \in S \\ k &gt; i}}
 \displaystyle \frac{\pi_{ik} - \pi_{i}\pi_{k}}{\pi_{ik}} \left(\frac{\hat{t}_{i}}{\pi_{i}} - \frac{\hat{t}_{k}}{\pi_{k}}\right)^{2}+
 \sum_{i \in S} \displaystyle \frac{\hat{V}(\hat{t_{i}})}{\pi_{i}}
 \]</span></p>
@@ -285,32 +319,49 @@ stands %&gt;%
 <p><span class="math inline">\(\hat{t}_{ij}\)</span> is the <span class="math inline">\(j\)</span>th estimate of the total on the <span class="math inline">\(i\)</span>th primary sample unit. In this case, we observed the cubic feet per acre on each plot then multiplied by stand acres to get total cubic feet.</p>
 <p>The Sen-Yates-Grundy formulation of the variance calculation requires each observation to be compared to the rest of the observations in the sample. There may be a more elegant way to code that part, but for now this is what I have come up with:</p>
 <pre class="r"><code># Sen-Yates-Grundy formulation
-var_syg &lt;- function(row, data, y, pi_i, p,
-                    jointProbs = NULL) {
+var_syg &lt;- function(row, data, y_var, pi_i_var, id_var, jointProbs) {
+  
   data$idx &lt;- 1:nrow(data)
-  a &lt;- data[row, ]
+  i &lt;- data[row, ]
   b &lt;- data[data$idx &gt; row, ]
   n &lt;- nrow(data)
+  
   if(row == max(data$idx)) {
     return(0)
   }
-  message(
-    paste0(
-      &quot;row &quot;, row
+  
+  r &lt;- as.character(i %&gt;% pull(!! id_var))
+  pi_i &lt;- i %&gt;% pull(!! pi_i_var)
+  y_i &lt;- i %&gt;% pull(!! y_var)
+  
+  x &lt;- c()
+  for (l in 1:nrow(b)) {
+    k &lt;- b[l, ]
+    pi_k &lt;- k %&gt;% pull(!! pi_i_var)
+    y_k &lt;- k %&gt;% pull(!! y_var)
+    
+    c &lt;- as.character(k %&gt;% pull(!! id_var))
+    jp &lt;- jointProbs[row.names(jointProbs) == r, c]
+
+    x[l] &lt;- ((pi_i * pi_k - jp) / jp) *
+      (y_i / pi_i - y_k / pi_k)^2
+  }
+  
+  sum(x)
+}
+
+var_syg_wrap &lt;- function(data, y_var, pi_i_var, id_var, jointProbs) {
+  unlist(
+    purrr::map(
+      1:nrow(data),
+      var_syg,
+      data = data,
+      y_var = enquo(y_var),
+      pi_i_var = enquo(pi_i_var),
+      id_var = enquo(id_var),
+      jointProbs = jointProbs
     )
   )
-  x &lt;- list()
-  for (l in 1:nrow(b)) {
-    c &lt;- b[l, ]
-    r &lt;- as.character(a[[&quot;id&quot;]])
-    col &lt;- as.character(c[[&quot;id&quot;]])
-    jp &lt;- jointProbs[row.names(jointProbs) == r, col]
-
-    x[[l]] &lt;- ((a[[pi_i]] * c[[pi_i]] - jp) / jp) *
-      (a[[y]] / a[[pi_i]] - c[[y]] / c[[pi_i]])^2
-  }
-
-  sum(unlist(x))
 }</code></pre>
 </div>
 <div id="stand-level-estimates" class="section level3">
@@ -318,7 +369,7 @@ var_syg &lt;- function(row, data, y, pi_i, p,
 <p>We can start by summarizing the stand-level estimates. For each stand we will estimate the total volume using the mean volume per acre from the sample and the total acres of each stand. We will also compute the sample variance and estimate the total variance for each stand.</p>
 <pre class="r"><code>standDat &lt;- plotTab %&gt;%
   left_join(
-    sampStands %&gt;% select(id, acres, cuftPerAc, nPlots, pi_i = pi_i_sim),
+    sampStands %&gt;% select(id, acres, cuftPerAc, nPlots, pi_i),
     by = &quot;id&quot;
   ) %&gt;%
   group_by(id) %&gt;%
@@ -346,25 +397,22 @@ standDat %&gt;%
 <pre class="r"><code>sampleSummary &lt;- standDat %&gt;%
   left_join(
     sampStands %&gt;%
-      select(id, pi_i = pi_i_sim, prop),
+      select(id, pi_i, prop),
     by = &quot;id&quot;
   ) %&gt;%
   ungroup() %&gt;%
+  nest() %&gt;%
   mutate(
-    var_I_syg = unlist(
-      parallel::mclapply(
-        1:nrow(.),
-        var_syg,
-        data = .,
-        y = &quot;tHat&quot;,
-        pi_i = &quot;pi_i&quot;,
-        p = &quot;prop&quot;,
-        jointProbs = jointProbs,
-        mc.cores = 12
-      )
+    var_I_syg = map(
+      .x = .$data,
+      .f = var_syg_wrap,
+      y_var = tHat,
+      pi_i_var = pi_i,
+      id_var = id,
+      jointProbs = jointProbs
     )
   ) %&gt;%
-  ungroup() %&gt;%
+  unnest() %&gt;%
   summarize(
     totalCuft = sum(tHat / pi_i),
     fpcI = 1,
@@ -415,24 +463,34 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
 <h2>Simulate many samples</h2>
 <p>Though we may be stuck with it in real life, the result of a single sample is not very helpful for evaluating the performance of a sample design. To do that we will simulate many samples and evaluate the performance of various sampling intensities by assessing trends in precision and bias.</p>
 <p>We are simulating 100 samples for six sample intensities: 10, 20, and 30 stands out of the 100 in the population. Stands will be selected using the same probabilities as the example we walked through earlier.</p>
-<p>The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates and the precision of estimates increases substantially as we sample more stands. <img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot1-1.png" width="672" /></p>
+<p>The plot of simulated sample means with 90% confidence intervals and the true population mean (green line) shows that each sample intensity yields accurate estimates and the precision of estimates increases substantially as we sample more stands.
+<img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simulationPlot1-1.png" width="672" /></p>
 <p>We expect ~90% of samples to yield a confidence interval that contains the true mean, this simulation gives the expected result. The results indicate that the half-width of the 90% confidence interval is about 10% of the mean when we sample 20 stands out of 100.</p>
-<table style="width:75%;">
+<table style="width:76%;">
 <caption>summary of unequal probability sampling simulation</caption>
 <colgroup>
 <col width="16%" />
 <col width="13%" />
 <col width="15%" />
 <col width="12%" />
-<col width="16%" />
+<col width="18%" />
 </colgroup>
 <thead>
 <tr class="header">
 <th align="center">source</th>
-<th align="center"># sampled stands</th>
-<th align="center">average sample cu. ft. per/ac</th>
+<th align="center">#
+sampled
+stands</th>
+<th align="center">average
+sample
+cu. ft.
+per/ac</th>
 <th align="center">90% CI</th>
-<th align="center">proportion of CIs containing true mean</th>
+<th align="center">proportion
+of CIs
+containing
+true
+mean</th>
 </tr>
 </thead>
 <tbody>
@@ -474,22 +532,31 @@ results &lt;- bind_rows(sampleSummary, truth)</code></pre>
 <p>The simple random sampling yields mean estimates that are much less stable than the unequal probability sample, which is the expected result. The correspondingly wide confidence intervals reflect the reduced precision of the simple random sample.</p>
 <p><img src="/post/horvitz-thompson/2019-02-04-horvitz_thompson_files/figure-html/simStatsSRS-1.png" width="672" /></p>
 <p>The wider confidence intervals reflect greater uncertainty in the estimate of the population mean. Notice that the proportion of CIs that contain the true mean is stil ~90%.</p>
-<table style="width:75%;">
+<table style="width:76%;">
 <caption>summary of equal probability sampling simulation</caption>
 <colgroup>
 <col width="16%" />
 <col width="13%" />
 <col width="15%" />
 <col width="12%" />
-<col width="16%" />
+<col width="18%" />
 </colgroup>
 <thead>
 <tr class="header">
 <th align="center">source</th>
-<th align="center"># sampled stands</th>
-<th align="center">average sample cu. ft. per/ac</th>
+<th align="center">#
+sampled
+stands</th>
+<th align="center">average
+sample
+cu. ft.
+per/ac</th>
 <th align="center">90% CI</th>
-<th align="center">proportion of CIs containing true mean</th>
+<th align="center">proportion
+of CIs
+containing
+true
+mean</th>
 </tr>
 </thead>
 <tbody>
