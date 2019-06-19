@@ -22,6 +22,7 @@ library(leaflet)
 
 ### vector data
 There are several datasets built into the spData package that I will use:
+
   * `us_states`
   * `world`
 These are 'simple features' objects that are pre-loaded into R. You can also load spatial data into R using the function `st_read` from the `sf` package. See my [post](https://hrodmn.rbind.io/post/sf/2018-09-24-sf/) on getting started with `sf` for more on that.
