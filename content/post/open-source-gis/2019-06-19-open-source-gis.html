@@ -25,9 +25,9 @@ output: html_document
 <p>There are several datasets built into the spData package that I will use:</p>
 <ul>
 <li><code>us_states</code></li>
-<li><code>world</code>
-These are ‘simple features’ objects that are pre-loaded into R. You can also load spatial data into R using the function <code>st_read</code> from the <code>sf</code> package. See my <a href="https://hrodmn.rbind.io/post/sf/2018-09-24-sf/">post</a> on getting started with <code>sf</code> for more on that.</li>
+<li><code>world</code></li>
 </ul>
+<p>These are ‘simple features’ objects that are pre-loaded into R when you load the <code>spData</code> package. You can also load spatial data (shapefiles, geojson, etc) into R using the function <code>st_read</code> from the <code>sf</code> package. See my <a href="https://hrodmn.rbind.io/post/sf/2018-09-24-sf/">post</a> on getting started with <code>sf</code> for more on that.</p>
 <pre class="r"><code># us_states is a built in dataset to package spData
 head(us_states)</code></pre>
 <pre><code>## Simple feature collection with 6 features and 6 fields
@@ -59,7 +59,7 @@ worldReproj &lt;- world %&gt;%
 </div>
 <div id="raster-data" class="section level3">
 <h3>raster data</h3>
-<p>It is also possible to load raster data into R via the <code>raster</code> package.</p>
+<p>Raster data can be loaded into R using the <code>raster</code> package. <code>raster</code> data objects do not play very nicely with <code>sf</code> objects, but that should change in the near future.</p>
 <pre class="r"><code># download a climate raster
 if (!file.exists(&quot;/tmp/climate-rasts.zip&quot;)) {
   download.file(
@@ -94,13 +94,13 @@ janTemp &lt;- raster::raster(
 </div>
 <div id="leaflet" class="section level2">
 <h2>Leaflet</h2>
-<p>Leaflet is a very powerful tool that allows you to render interactive maps with vector and raster layers.</p>
+<p>Leaflet is a powerful tool that allows you to render interactive maps with vector and raster layers. Th</p>
 <pre class="r"><code>temp_pallette &lt;- colorNumeric(
   c(&quot;#0C2C84&quot;, &quot;#41B6C4&quot;, &quot;#FFFFCC&quot;),
   raster::values(janTemp),
   reverse = FALSE,
   na.color = &quot;transparent&quot;
-  )
+)
 
 # set extent of map to entire earth
 world_extent &lt;- worldReproj %&gt;%
