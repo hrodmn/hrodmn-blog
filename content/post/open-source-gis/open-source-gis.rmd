@@ -1,0 +1,164 @@
+---
+title: "Open Source GIS in R"
+author: "Henry Rodman"
+date: "June 19, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  cache = TRUE,
+  echo = TRUE,
+  message = FALSE
+)
+
+library(tidyverse)
+library(sf)
+library(spData)
+library(leaflet)
+```
+
+## Spatial data in R
+
+### vector data
+There are several datasets built into the spData package that I will use:
+  * `us_states`
+  * `world`
+These are 'simple features' objects that are pre-loaded into R. You can also load spatial data into R using the function `st_read` from the `sf` package. See my [post](https://hrodmn.rbind.io/post/sf/2018-09-24-sf/) on getting started with `sf` for more on that.
+
+```{r get_data}
+# us_states is a built in dataset to package spData
+head(us_states)
+
+# reproject to EPSG:4326
+statesReproj <- us_states %>%
+  st_transform(4326)
+
+worldReproj <- world %>%
+  st_transform(4326)
+```
+
+### raster data
+It is also possible to load raster data into R via the `raster` package.
+```{r raster}
+# download a climate raster
+if (!file.exists("/tmp/climate-rasts.zip")) {
+  download.file(
+    url = "http://biogeo.ucdavis.edu/data/worldclim/v2.0/tif/base/wc2.0_10m_tavg.zip",
+    destfile = "/tmp/climate-rasts.zip"
+  )
+}
+
+unzip(
+  zipfile = "/tmp/climate-rasts.zip",
+  exdir = "/tmp/climate-rasts"
+)
+rasts <- list.files(
+  "/tmp/climate-rasts",
+  full.names = TRUE
+)
+
+janTemp <- raster::raster(
+  rasts %>%
+    stringr::str_subset("tavg_01.tif")
+)
+
+```
+
+R and the spatial packages have easy methods for plotting spatial data.
+```{r quick_plot}
+plot(statesReproj)
+plot(worldReproj)
+
+raster::plot(janTemp)
+
+```
+
+## Leaflet
+Leaflet is a very powerful tool that allows you to render interactive maps with vector and raster layers.
+```{r leaflet_map}
+temp_pallette <- colorNumeric(
+  c("#0C2C84", "#41B6C4", "#FFFFCC"), 
+  raster::values(janTemp),
+  reverse = FALSE,
+  na.color = "transparent"
+  )
+
+# set extent of map to entire earth
+world_extent <- worldReproj %>%
+  mutate(planet = "Earth") %>%
+  group_by(planet) %>%
+  summarize() %>%
+  st_convex_hull()
+
+bounds <- st_coordinates(world_extent) %>% 
+  as_tibble() %>% 
+  setNames(c("lon","lat", "l1", "l2"))
+
+leaflet(height = "500px") %>%
+  addTiles() %>%
+  addProviderTiles("Esri.WorldImagery") %>%
+  addRasterImage(
+    janTemp, 
+    color = temp_pallette, 
+    opacity = 0.8, 
+    group = "January mean temp (C)"
+  ) %>%
+  addPolygons(
+    data = worldReproj,
+    stroke = TRUE,
+    weight = 2,
+    smoothFactor = 0.2,
+    fillOpacity = 0,
+    color = "black",
+    group = "countries"
+  ) %>%  
+  addPolygons(
+    data = statesReproj,
+    stroke = TRUE,
+    weight = 1,
+    smoothFactor = 0.2,
+    fillOpacity = 0,
+    color = "blue",
+    group = "states"
+  ) %>%
+  addLayersControl(
+    overlayGroups = c(
+      "January mean temp (C)",
+      "countries",
+      "states"
+    ),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    pal = temp_pallette,
+    values = raster::values(janTemp)
+  ) %>%
+  fitBounds(min(bounds$lon), min(bounds$lat), max(bounds$lon), max(bounds$lat))
+
+```
+
+## Geopackages
+Since I use open source software for everything, I disdain geodatabases! I understand why people use them but I am not able to open most geodatabases on my Mac or Linux machines. Fortunately there is an alternative to the geodatabase: **the geopackage**. 
+
+Geopackages can hold polygon, point, line, and raster layers (with tiles!). It is very easy to write vector layers to a geopackage from R, not as easy to write raster layers but it is possible (stay tuned).
+```{r geopackage}
+# add countries layer
+st_write(
+  worldReproj,
+  layer = "countries",
+  driver = "GPKG",
+  dsn = "open_source_gis.gpkg",
+  delete_dsn = TRUE
+)
+
+# add states layer
+st_write(
+  statesReproj,
+  layer = "states",
+  driver = "GPKG",
+  dsn = "open_source_gis.gpkg",
+  update = TRUE
+)
+
+```
