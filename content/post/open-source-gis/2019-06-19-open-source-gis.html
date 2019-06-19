@@ -1,7 +1,7 @@
 ---
 title: "Open Source GIS in R"
 author: "Henry Rodman"
-date: "June 19, 2019"
+date: "2019-06-19"
 output: html_document
 ---
 
@@ -94,7 +94,7 @@ janTemp &lt;- raster::raster(
 <h2>Leaflet</h2>
 <p>Leaflet is a very powerful tool that allows you to render interactive maps with vector and raster layers.</p>
 <pre class="r"><code>temp_pallette &lt;- colorNumeric(
-  c(&quot;#0C2C84&quot;, &quot;#41B6C4&quot;, &quot;#FFFFCC&quot;), 
+  c(&quot;#0C2C84&quot;, &quot;#41B6C4&quot;, &quot;#FFFFCC&quot;),
   raster::values(janTemp),
   reverse = FALSE,
   na.color = &quot;transparent&quot;
@@ -107,17 +107,17 @@ world_extent &lt;- worldReproj %&gt;%
   summarize() %&gt;%
   st_convex_hull()
 
-bounds &lt;- st_coordinates(world_extent) %&gt;% 
-  as_tibble() %&gt;% 
+bounds &lt;- st_coordinates(world_extent) %&gt;%
+  as_tibble() %&gt;%
   setNames(c(&quot;lon&quot;,&quot;lat&quot;, &quot;l1&quot;, &quot;l2&quot;))
 
 leaflet(height = &quot;500px&quot;) %&gt;%
   addTiles() %&gt;%
   addProviderTiles(&quot;Esri.WorldImagery&quot;) %&gt;%
   addRasterImage(
-    janTemp, 
-    color = temp_pallette, 
-    opacity = 0.8, 
+    janTemp,
+    color = temp_pallette,
+    opacity = 0.8,
     group = &quot;January mean temp (C)&quot;
   ) %&gt;%
   addPolygons(
@@ -128,7 +128,7 @@ leaflet(height = &quot;500px&quot;) %&gt;%
     fillOpacity = 0,
     color = &quot;black&quot;,
     group = &quot;countries&quot;
-  ) %&gt;%  
+  ) %&gt;%
   addPolygons(
     data = statesReproj,
     stroke = TRUE,
